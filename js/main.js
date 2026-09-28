@@ -10,7 +10,7 @@ const els = {
   hud: $('hud'), score: $('score'), theme: $('theme'),
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
-  best: $('best'), share: $('share'), flyWith: $('flyWith'),
+  best: $('best'), share: $('share'), seeCrash: $('seeCrash'), flyWith: $('flyWith'),
   craftPrev: $('craftPrev'), craftNext: $('craftNext'), craftName: $('craftName'),
   flash: $('flash'),
 };
@@ -42,6 +42,36 @@ scene.add(plane);
 const world = new World(scene, theme);
 const input = new Input(renderer.domElement);
 
+// crash marker: a pulsing ring at the exact collision point — yellow on
+// reddish skies, red otherwise — so the player can always see what they hit
+const crashMarker = new THREE.Mesh(
+  new THREE.RingGeometry(0.8, 1.15, 32),
+  new THREE.MeshBasicMaterial({ color: 0xffd60a, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false }),
+);
+crashMarker.renderOrder = 999;
+crashMarker.visible = false;
+scene.add(crashMarker);
+const bgHsl = { h: 0, s: 0, l: 0 };
+function markCrash(point) {
+  crashMarker.position.copy(point);
+  scene.background.getHSL(bgHsl);
+  crashMarker.material.color.set(bgHsl.s > 0.15 && (bgHsl.h < 0.09 || bgHsl.h > 0.92) ? 0xffd60a : 0xff3b30);
+  crashMarker.scale.setScalar(1);
+  crashMarker.visible = true;
+}
+let crashView = false; // "see crash" mode: modal hidden, camera framing the wreck
+let crashTimer = null;
+function endCrashView() {
+  crashView = false;
+  els.over.hidden = false;
+}
+function seeCrash() {
+  els.over.hidden = true;
+  crashView = true;
+  clearTimeout(crashTimer);
+  crashTimer = setTimeout(endCrashView, 3200); // back to the modal after a look
+}
+
 // ------------------------------------------------------------------ state
 
 const BEST_KEY = 'paperWings.best';
@@ -61,6 +91,9 @@ function reset() {
   vy = 0; steer = 0;
   spawnHold = true;
   input.steerX = 0; // touch steering holds between runs — clear it on (re)start
+  crashMarker.visible = false;
+  crashView = false;
+  clearTimeout(crashTimer);
   state = 'flying';
   els.start.hidden = true;
   els.over.hidden = true;
@@ -69,6 +102,7 @@ function reset() {
 
 function crash() {
   state = 'crashed';
+  markCrash(plane.position);
   const total = score.total;
   if (total > best) localStorage.setItem(BEST_KEY, String(total));
   showOver(total);
@@ -120,6 +154,8 @@ const scoreCard = () => {
   return card;
 };
 els.share.addEventListener('click', () => shareCard(scoreCard(), `I scored ${Math.floor(score.total)} — beat me?`));
+els.seeCrash.addEventListener('click', seeCrash);
+renderer.domElement.addEventListener('pointerdown', () => { if (crashView) endCrashView(); }); // tap = done looking
 
 // ?play=1 (from the root landing): straight into the air, no title panel.
 // The start panel ships hidden so it never flashes while the modules load.
@@ -183,6 +219,12 @@ function frame(now) {
     camera.position.y += (plane.position.y * 0.4 + 6 - camera.position.y) * Math.min(1, dt * 4);
     camera.position.z = plane.position.z + layout.camDist;
     camera.lookAt(plane.position.x * 0.5, plane.position.y * 0.5 + 2, plane.position.z - 14);
+  }
+
+  if (state === 'crashed') {
+    crashMarker.lookAt(camera.position);
+    crashMarker.scale.setScalar(1 + 0.18 * Math.sin(now / 140));
+    if (crashView) camera.lookAt(crashMarker.position);
   }
 
   renderer.render(scene, camera);
