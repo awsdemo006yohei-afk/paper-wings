@@ -288,19 +288,17 @@ export async function installCraft(plane, id, theme) {
 export class Input {
   constructor(el) {
     this.hold = false;
-    this.steerX = 0; // -1..1
+    this.steerX = 0; // -1..1 — kept on release: the plane HOLDS its lateral spot
     // Touch steers by slide DIRECTION only — where the finger lands and
     // starts is irrelevant: slide left → drift left, slide right → drift
-    // right, proportional to how far you slide. Mouse keeps absolute hover.
+    // right, proportional to how far you slide. Stop sliding (or lift the
+    // finger) and the plane STAYS put — slide the other way to come back.
+    // Mouse keeps absolute hover steering.
     let dragging = false;
     let lastX = 0;
     const DRAG = 100; // px of slide for full left/right
     const on = (v) => { this.hold = v; };
-    const release = (e) => {
-      on(false);
-      if (dragging) { this.steerX = 0; } // lift the thumb → glide back to center
-      dragging = false;
-    };
+    const release = () => { on(false); dragging = false; };
     el.addEventListener('pointerdown', (e) => {
       on(true);
       dragging = e.pointerType === 'touch';

@@ -10,7 +10,7 @@ const els = {
   hud: $('hud'), score: $('score'), theme: $('theme'),
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
-  best: $('best'), share: $('share'), again: $('again'), flyWith: $('flyWith'), copyScore: $('copyScore'),
+  best: $('best'), share: $('share'), flyWith: $('flyWith'), copyScore: $('copyScore'),
   craftPrev: $('craftPrev'), craftNext: $('craftNext'), craftName: $('craftName'),
   flash: $('flash'),
 };
@@ -58,6 +58,7 @@ function reset() {
   plane.rotation.set(0.06, 0, 0);
   camera.position.set(0, 9.2, 11);
   vy = 0; steer = 0;
+  input.steerX = 0; // touch steering holds between runs — clear it on (re)start
   state = 'flying';
   els.start.hidden = true;
   els.over.hidden = true;
@@ -81,7 +82,6 @@ function showOver(total) {
 }
 
 els.go.addEventListener('click', () => reset());
-els.again.addEventListener('click', () => reset());
 
 // hangar: pick your craft — curated, family-friendly models only
 const CRAFT_KEY = 'paperWings.craft';
