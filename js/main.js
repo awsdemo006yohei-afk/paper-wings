@@ -2,7 +2,7 @@
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt } from './logic.js';
 import { World, makePlane, installCraft, CRAFTS, Input } from './game.js';
-import { renderCard, shareCard, copyCard, downloadCard } from './share.js';
+import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
@@ -10,7 +10,7 @@ const els = {
   hud: $('hud'), score: $('score'), theme: $('theme'),
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
-  best: $('best'), share: $('share'), flyWith: $('flyWith'), copyScore: $('copyScore'),
+  best: $('best'), share: $('share'), flyWith: $('flyWith'),
   craftPrev: $('craftPrev'), craftNext: $('craftNext'), craftName: $('craftName'),
   flash: $('flash'),
 };
@@ -102,7 +102,7 @@ els.craftPrev.addEventListener('click', () => cycleCraft(-1));
 els.craftNext.addEventListener('click', () => cycleCraft(1));
 applyCraft();
 
-// score modal: fly again · fly with a different craft · share/copy the card
+// score modal: fly with a different craft (restart) · share the card
 const nextCraft = () => CRAFTS[(CRAFTS.findIndex((c) => c.id === craftId) + 1) % CRAFTS.length];
 function refreshFlyWith() { els.flyWith.textContent = `Fly with ${nextCraft().name}`; }
 els.flyWith.addEventListener('click', () => {
@@ -118,15 +118,6 @@ const scoreCard = () => {
   return card;
 };
 els.share.addEventListener('click', () => shareCard(scoreCard(), `I scored ${Math.floor(score.total)} — beat me?`));
-els.copyScore.addEventListener('click', () => {
-  copyCard(scoreCard())
-    .then(() => {
-      els.copyScore.textContent = 'copied ✓';
-      setTimeout(() => { els.copyScore.textContent = 'Copy picture'; }, 1400);
-    })
-    .catch(() => downloadCard(scoreCard())) // clipboard blocked (permissions etc.) → save instead
-    .catch(() => {});
-});
 
 // ?play=1 (from the root landing): straight into the air, no title panel.
 // The start panel ships hidden so it never flashes while the modules load.

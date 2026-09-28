@@ -59,12 +59,6 @@ export function canvasBlob(card) {
   return new Promise((res) => card.toBlob(res, 'image/png'));
 }
 
-/** Exactly one image lands in the clipboard — no share-sheet side copies. */
-export async function copyCard(card) {
-  const item = new ClipboardItem({ 'image/png': canvasBlob(card) }); // promise form keeps Safari happy
-  await navigator.clipboard.write([item]);
-}
-
 /** Save the card as a file. */
 export function downloadCard(card) {
   return canvasBlob(card).then((blob) => {
