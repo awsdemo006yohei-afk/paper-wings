@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>Paper Wings — fold, fly, survive</title>
+  <meta name="description" content="A one-button paper-plane flyer. Every day brings a new sky. Free, no install, runs in your browser." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9657119821733951" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="gl"></div>
+
+  <div id="hud">
+    <div id="score">0</div>
+    <div id="theme">today's sky</div>
+  </div>
+  <div id="flash"></div>
+
+  <div id="start" class="panel">
+    <h1>Paper <span>Wings</span></h1>
+    <p class="tag">hold to rise · release to dive · steer with your pointer</p>
+    <button id="go" class="primary">Take flight</button>
+    <p class="hint">every day has its own sky — today's is <b id="themeNameSlot">loading…</b></p>
+    <!-- banner ad slot: wired when the publisher ID lands -->
+    <div id="bannerAd" class="adslot" aria-hidden="true"></div>
+  </div>
+
+  <div id="over" class="panel" hidden>
+    <h2>folded.</h2>
+    <div id="finalScore" class="big">0</div>
+    <p id="finalDetail" class="tag"></p>
+    <p id="best" class="hint"></p>
+    <div class="row">
+      <button id="again" class="primary">Fly again</button>
+      <button id="share">Share score</button>
+    </div>
+    <!-- interstitial slot shown between runs -->
+    <div id="interstitialAd" class="adslot tall" aria-hidden="true"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

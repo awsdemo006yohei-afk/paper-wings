@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paper Wings — Delivery</title>
+  <style>
+    body { font: 16px/1.7 system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #2a2440; }
+    h1 { font-size: 32px; } h1 span { color: #ff6b6b; }
+    h2 { font-size: 19px; margin-top: 32px; border-bottom: 2px solid #ece7f8; padding-bottom: 4px; }
+    code { background: #f2eef9; border-radius: 6px; padding: 1px 7px; font-size: 14px; }
+    .tag { color: #7d7590; }
+    li { margin: 6px 0; }
+    .ok { color: #1a9c6b; font-weight: 700; }
+    .todo { color: #d97706; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>Paper <span>Wings</span> — delivery</h1>
+  <p class="tag">nightbuild 2026-09-28 · one-button paper-plane flyer · build &amp; host &amp; ads</p>
+
+  <h2>What shipped</h2>
+  <ul>
+    <li><span class="ok">Done</span> — full 3D endless flyer: hold to rise, release to dive, pointer steers. Pooled obstacles (paper boxes, spinning blades, golden rings), recycled scenery, chase camera.</li>
+    <li><span class="ok">Done</span> — <b>daily sky</b>: palette + wind + world seeded from the date. Everyone flies the same sky that day; a new one tomorrow.</li>
+    <li><span class="ok">Done</span> — scoring: meters + rings (+50) + near-misses (+10), ranks from Gust Guest to Wing Poet, personal best in localStorage.</li>
+    <li><span class="ok">Done</span> — silent by design (user call): no audio, no audio assets.</li>
+    <li><span class="ok">Done</span> — shareable 1200×630 canvas score card via Web Share (download fallback).</li>
+    <li><span class="ok">Done</span> — 14/14 offline tests on the pure logic module (<code>node tests/logic.test.mjs</code>).</li>
+    <li><span class="ok">Done</span> — keyless: vendored three.js r170, no build step, no API keys, runs from any static host.</li>
+  </ul>
+
+  <h2>Hosting</h2>
+  <ul>
+    <li><span class="ok">Done</span> — dedicated GitHub repo, game at repo root, GitHub Pages enabled (URL in chat).</li>
+  </ul>
+
+  <h2>Ad revenue — wired and pending Google's review</h2>
+  <ul>
+    <li><span class="ok">Done</span> — AdSense live: publisher <code>ca-pub-9657119821733951</code> in the page head, responsive banner on the start panel, fresh rectangle unit every game-over (the natural break), <code>privacy.html</code> included, and <code>ads.txt</code> served both at the site path and the domain root (via the user-site repo, as the IAB spec requires).</li>
+    <li><span class="todo">Waiting on Google</span> — site review after the code was detected; usually a few days to ~2 weeks. Ads render unfilled (invisible) until approval; revenue starts then.</li>
+    <li class="tag">Reality check: at $1–5 RPM, meaningful money needs thousands of daily plays — the share card is the growth lever. Expect pocket change first, not rent.</li>
+  </ul>
+
+  <h2>Honest gaps</h2>
+  <ul>
+    <li>No leaderboard (localStorage best only) — a backend would compromise the keyless/static story.</li>
+    <li>Interstitial slot reserved but empty until AdSense approval; games policy also wants a natural break, which game-over provides.</li>
+    <li>Desktop + mobile pointer input tested in headless Chromium; real-device touch feel not verified.</li>
+  </ul>
+</body>
+</html>
