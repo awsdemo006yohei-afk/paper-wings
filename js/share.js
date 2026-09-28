@@ -54,22 +54,40 @@ function rounded(x, px, py, w, h, r) {
   x.closePath();
 }
 
-/** Try the native share sheet, fall back to a download. */
-export async function shareCard(canvas, url) {
-  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+/** The card as a PNG blob. */
+export function canvasBlob(card) {
+  return new Promise((res) => card.toBlob(res, 'image/png'));
+}
+
+/** Exactly one image lands in the clipboard — no share-sheet side copies. */
+export async function copyCard(card) {
+  const item = new ClipboardItem({ 'image/png': canvasBlob(card) }); // promise form keeps Safari happy
+  await navigator.clipboard.write([item]);
+}
+
+/** Save the card as a file. */
+export function downloadCard(card) {
+  return canvasBlob(card).then((blob) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'paper-wings-score.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  });
+}
+
+/** Native share sheet (mobile-friendly), fall back to a download. */
+export async function shareCard(card, text) {
+  const blob = await canvasBlob(card);
   const file = new File([blob], 'paper-wings.png', { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'Paper Wings', text: `I scored ${canvas.dataset.total} — beat me?` });
+      await navigator.share({ files: [file], title: 'Paper Wings', text });
       return 'shared';
     } catch (e) {
       if (e.name === 'AbortError') return 'cancelled';
     }
   }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'paper-wings-score.png';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  await downloadCard(card);
   return 'downloaded';
 }

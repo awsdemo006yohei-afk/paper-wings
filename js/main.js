@@ -2,7 +2,7 @@
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt } from './logic.js';
 import { World, makePlane, installCraft, CRAFTS, Input } from './game.js';
-import { renderCard, shareCard } from './share.js';
+import { renderCard, shareCard, copyCard, downloadCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
@@ -10,7 +10,7 @@ const els = {
   hud: $('hud'), score: $('score'), theme: $('theme'),
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
-  best: $('best'), share: $('share'), again: $('again'),
+  best: $('best'), share: $('share'), again: $('again'), flyWith: $('flyWith'), copyScore: $('copyScore'),
   craftPrev: $('craftPrev'), craftNext: $('craftNext'), craftName: $('craftName'),
   flash: $('flash'),
 };
@@ -75,6 +75,7 @@ function showOver(total) {
   els.finalScore.textContent = String(total);
   els.finalDetail.textContent = `${rankFor(total)} · ${Math.floor(score.distance)} m · ${score.rings} rings · ${score.nearMisses} near misses`;
   els.best.textContent = `personal best ${Math.max(best, total)}`;
+  refreshFlyWith();
   els.over.hidden = false;
   try { showInterstitial(document.getElementById('interstitialAd')); } catch {} // ads must never break the game-over flow
 }
@@ -101,6 +102,32 @@ els.craftPrev.addEventListener('click', () => cycleCraft(-1));
 els.craftNext.addEventListener('click', () => cycleCraft(1));
 applyCraft();
 
+// score modal: fly again · fly with a different craft · share/copy the card
+const nextCraft = () => CRAFTS[(CRAFTS.findIndex((c) => c.id === craftId) + 1) % CRAFTS.length];
+function refreshFlyWith() { els.flyWith.textContent = `Fly with ${nextCraft().name}`; }
+els.flyWith.addEventListener('click', () => {
+  craftId = nextCraft().id;
+  localStorage.setItem(CRAFT_KEY, craftId);
+  applyCraft();
+  refreshFlyWith();
+  reset();
+});
+const scoreCard = () => {
+  const card = renderCard({ themeName: theme.name, palette: p, score, best: Math.max(best, score.total), rank: rankFor(score.total), url: SITE_URL });
+  card.dataset.total = score.total;
+  return card;
+};
+els.share.addEventListener('click', () => shareCard(scoreCard(), `I scored ${Math.floor(score.total)} — beat me?`));
+els.copyScore.addEventListener('click', () => {
+  copyCard(scoreCard())
+    .then(() => {
+      els.copyScore.textContent = 'copied ✓';
+      setTimeout(() => { els.copyScore.textContent = 'Copy picture'; }, 1400);
+    })
+    .catch(() => downloadCard(scoreCard())) // clipboard blocked (permissions etc.) → save instead
+    .catch(() => {});
+});
+
 // ?play=1 (from the root landing): straight into the air, no title panel.
 // The start panel ships hidden so it never flashes while the modules load.
 if (new URLSearchParams(location.search).has('play')) {
@@ -108,12 +135,6 @@ if (new URLSearchParams(location.search).has('play')) {
 } else {
   els.start.hidden = false;
 }
-els.share.addEventListener('click', () => {
-  const card = renderCard({ themeName: theme.name, palette: p, score, best: Math.max(best, score.total), rank: rankFor(score.total), url: SITE_URL });
-  card.dataset.total = score.total;
-  shareCard(card, SITE_URL);
-});
-
 els.theme.textContent = `today's sky — ${theme.name}`;
 document.getElementById('themeNameSlot').textContent = theme.name;
 
@@ -133,7 +154,7 @@ function frame(now) {
     vy = Math.max(-18, Math.min(14, vy));
     plane.position.y += vy * dt;
 
-    const targetSteer = input.steerX * 18;
+    const targetSteer = input.steerX * layout.reach;
     steer += (targetSteer - steer) * Math.min(1, dt * 8);
     plane.position.x += (steer - plane.position.x) * Math.min(1, dt * 12);
 
@@ -160,7 +181,7 @@ function frame(now) {
     // camera chase with lag
     camera.position.x += (plane.position.x * 0.55 - camera.position.x) * Math.min(1, dt * 4);
     camera.position.y += (plane.position.y * 0.4 + 6 - camera.position.y) * Math.min(1, dt * 4);
-    camera.position.z = plane.position.z + 11;
+    camera.position.z = plane.position.z + layout.camDist;
     camera.lookAt(plane.position.x * 0.5, plane.position.y * 0.5 + 2, plane.position.z - 14);
   }
 
@@ -176,9 +197,26 @@ function flash(text) {
   flashTimer = setTimeout(() => { els.flash.style.opacity = 0; }, 700);
 }
 
+// portrait phones are a different game: pull the camera back, squeeze the
+// steering reach and the obstacle corridor into what's actually on screen
+const layout = { camDist: 11, reach: 18 };
+function updateLayout() {
+  if (camera.aspect >= 1) {
+    layout.camDist = 11;
+    layout.reach = 18;
+    world.narrow = 1;
+  } else {
+    layout.camDist = 11 + (1 - camera.aspect) * 10;
+    const halfW = Math.tan((camera.fov * Math.PI) / 360) * layout.camDist * camera.aspect;
+    layout.reach = Math.min(18, halfW * 0.9);
+    world.narrow = Math.min(1, (layout.reach + 1.5) / 19);
+  }
+}
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  updateLayout();
 });
+updateLayout();
 requestAnimationFrame(frame);

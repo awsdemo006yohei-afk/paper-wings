@@ -15,6 +15,7 @@ export class World {
     this.stretchIndex = 0;
     this.items = [];            // active obstacles {mesh, def}
     this.pool = { box: [], blade: [], ring: [] };
+    this.narrow = 1;            // portrait screens squeeze the obstacle corridor toward center
     this.ridges = [];
     this.clouds = [];
 
@@ -78,7 +79,7 @@ export class World {
     while (this.stretchIndex * 120 < -planeZ + 360) {
       const diff = difficultyAt(-planeZ);
       const defs = planStretch(this.seed, this.stretchIndex, diff);
-      for (const def of defs) this.spawn(def);
+      for (const d of defs) this.spawn(this.narrow === 1 ? d : { ...d, x: d.x * this.narrow });
       this.stretchIndex += 1;
     }
   }
@@ -288,15 +289,34 @@ export class Input {
   constructor(el) {
     this.hold = false;
     this.steerX = 0; // -1..1
+    // Touch steers by slide DIRECTION only — where the finger lands and
+    // starts is irrelevant: slide left → drift left, slide right → drift
+    // right, proportional to how far you slide. Mouse keeps absolute hover.
+    let dragging = false;
+    let lastX = 0;
+    const DRAG = 100; // px of slide for full left/right
     const on = (v) => { this.hold = v; };
-    el.addEventListener('pointerdown', (e) => { on(true); this.point(e); });
-    el.addEventListener('pointerup', () => on(false));
-    el.addEventListener('pointerleave', () => on(false));
-    el.addEventListener('pointermove', (e) => this.point(e));
+    const release = (e) => {
+      on(false);
+      if (dragging) { this.steerX = 0; } // lift the thumb → glide back to center
+      dragging = false;
+    };
+    el.addEventListener('pointerdown', (e) => {
+      on(true);
+      dragging = e.pointerType === 'touch';
+      lastX = e.clientX;
+      if (!dragging) this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
+    });
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave', release);
+    el.addEventListener('pointermove', (e) => {
+      if (dragging) {
+        this.steerX = Math.max(-1, Math.min(1, this.steerX + (e.clientX - lastX) / DRAG));
+        lastX = e.clientX;
+      } else if (e.pointerType !== 'touch') this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
+    });
     window.addEventListener('keydown', (e) => { if (e.code === 'Space') on(true); });
     window.addEventListener('keyup', (e) => { if (e.code === 'Space') on(false); });
-  }
-  point(e) {
-    this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
   }
 }
