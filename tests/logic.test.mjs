@@ -121,5 +121,19 @@ await test('World.reset restores the opening field for runs 2+', async () => {
   assert.ok(w.items.some((e) => e.def.z < -120), 'obstacles near the opening stretch');
 });
 
+await test('hangar: every code-built craft folds into a game-sized group', async () => {
+  const { CRAFTS } = await import('../js/game.js');
+  const THREE = await import('../js/three.module.min.js');
+  const theme = { palette: { accent: 0xff6b6b } };
+  for (const c of CRAFTS.filter((c) => c.build)) {
+    const m = c.build(theme);
+    assert.ok(m.isGroup && m.children.length > 0, `${c.id} builds a non-empty group`);
+    const size = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
+    assert.ok(size.z > 1.2 && size.z < 6, `${c.id} spans the flight axis like a craft (z=${size.z.toFixed(2)})`);
+    assert.ok(Math.max(size.x, size.y, size.z) < 8, `${c.id} stays game-sized`);
+  }
+  assert.ok(CRAFTS.some((c) => c.id === 'rocket' && !c.build), 'rocket stays the Blender glTF');
+});
+
 console.log(`\n${passed} passed, ${fails.length} failed`);
 process.exit(fails.length ? 1 : 0);

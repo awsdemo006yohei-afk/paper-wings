@@ -159,23 +159,127 @@ export function makePlane() {
   return g;
 }
 
-/** Load the Blender paper rocket (assets/rocket.glb) and fit it as the craft: nose toward -Z, ~3.4 units long. */
-export function installRocket(plane) {
-  return new Promise((resolve, reject) => {
-    new GLTFLoader().load('assets/rocket.glb', (gltf) => {
-      const model = gltf.scene;
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.sub(center); // pivot at the middle of the craft
-      const fit = new THREE.Group();
-      fit.rotation.x = -Math.PI / 2; // asset is authored +Y-up → nose to -Z
-      fit.scale.setScalar(3.4 / size.y);
-      fit.add(model);
-      plane.add(fit);
-      resolve(plane);
-    }, undefined, reject);
-  });
+/** Load the Blender paper rocket (assets/rocket.glb), normalized once; cloned per use. */
+let rocketScene = null;
+function loadRocketScene() {
+  if (!rocketScene) {
+    rocketScene = new Promise((resolve, reject) => {
+      new GLTFLoader().load('assets/rocket.glb', (gltf) => {
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center); // pivot at the middle of the craft
+        const fit = new THREE.Group();
+        fit.rotation.x = -Math.PI / 2; // asset is authored +Y-up → nose to -Z
+        fit.scale.setScalar(3.4 / size.y);
+        fit.add(model);
+        resolve(fit);
+      }, undefined, reject);
+    });
+  }
+  return rocketScene;
+}
+
+// --------------------------------------------------------------- hangar
+
+/** Paper materials shared by the folded crafts. */
+function paperMats(accent) {
+  return {
+    white: new THREE.MeshStandardMaterial({ color: 0xfff8ef, roughness: 0.6, flatShading: true, side: THREE.DoubleSide }),
+    accent: new THREE.MeshStandardMaterial({ color: accent, roughness: 0.55, flatShading: true, side: THREE.DoubleSide }),
+  };
+}
+
+function tri(mat, a, b, c) {
+  const g = new THREE.BufferGeometry().setFromPoints([a, b, c]);
+  g.setIndex([0, 1, 2]);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
+}
+
+/** Classic paper dart, nose toward -Z. */
+function buildPaperPlane(theme) {
+  const g = new THREE.Group();
+  const { white } = paperMats(theme.palette.accent);
+  const Z = (z, y = 0, x = 0) => new THREE.Vector3(x, y, z);
+  g.add(
+    tri(white, Z(1.15), Z(-1.55), new THREE.Vector3(-1.35, 0.28, 1.05)),  // left wing
+    tri(white, Z(1.15), Z(-1.55), new THREE.Vector3(1.35, 0.28, 1.05)),   // right wing
+    tri(white, Z(1.15), Z(-1.55), Z(1.05, -0.55)),                        // keel
+  );
+  return g;
+}
+
+/** Origami crane — folded bird with raised wings, nose (head) toward -Z. */
+function buildCrane(theme) {
+  const g = new THREE.Group();
+  const { white, accent } = paperMats(theme.palette.accent);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  // body: slim folded diamond along z
+  g.add(
+    tri(white, V(0, 0.1, 0.55), V(0, 0.1, -0.75), V(0, -0.3, 0.1)),
+    tri(white, V(0, 0.1, 0.55), V(0, 0.1, -0.75), V(0.06, -0.3, 0.1)),
+  );
+  // wings: big raised triangles
+  g.add(
+    tri(accent, V(0.12, 0.05, 0.35), V(0.12, 0.05, -0.5), V(1.35, 0.75, -0.1)),
+    tri(accent, V(-0.12, 0.05, 0.35), V(-0.12, 0.05, -0.5), V(-1.35, 0.75, -0.1)),
+  );
+  // neck with head fold, pointing forward (-Z)
+  g.add(
+    tri(white, V(0, 0.1, -0.5), V(0, 0.42, -1.25), V(0, 0.2, -0.45)),
+    tri(accent, V(0, 0.42, -1.25), V(0, 0.62, -1.16), V(0, 0.38, -1.1)),  // beak/head
+  );
+  // tail spike
+  g.add(tri(white, V(0, 0.1, 0.65), V(0, 0.42, 1.45), V(0, 0.16, 0.6)));
+  return g;
+}
+
+/** Paper butterfly — twin upper/lower wing pairs, head toward -Z. */
+function buildButterfly(theme) {
+  const g = new THREE.Group();
+  const { white, accent } = paperMats(theme.palette.accent);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  // body along z, head forward
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.5, 6), paperMats(theme.palette.accent).white);
+  body.rotation.x = -Math.PI / 2;
+  g.add(body);
+  // upper wings (broad, swept back with a little lift) + lower wings (smaller)
+  for (const s of [1, -1]) {
+    g.add(
+      tri(accent, V(s * 0.08, 0.05, 0.35), V(s * 1.4, 0.35, -0.35), V(s * 0.12, 0.02, -0.5)),
+      tri(white, V(s * 0.08, 0, -0.05), V(s * 1.0, -0.18, -0.6), V(s * 0.1, 0, -0.75)),
+    );
+  }
+  return g;
+}
+
+export const CRAFTS = [
+  { id: 'plane', name: 'Paper Plane', build: buildPaperPlane },
+  { id: 'rocket', name: 'Paper Rocket', build: null }, // the Blender glTF
+  { id: 'crane', name: 'Origami Crane', build: buildCrane },
+  { id: 'butterfly', name: 'Paper Butterfly', build: buildButterfly },
+];
+
+/**
+ * Swap the plane's craft. Curated hangar only — every model here is
+ * hand-reviewed, family-friendly paper art; nothing user-generated
+ * ever loads at runtime (keeps the site AdSense-safe by construction).
+ */
+export async function installCraft(plane, id, theme) {
+  const craft = CRAFTS.find((c) => c.id === id) || CRAFTS[0];
+  let model;
+  if (craft.build) {
+    model = craft.build(theme);
+  } else {
+    model = (await loadRocketScene()).clone(true);
+  }
+  if (plane.userData.craft) plane.remove(plane.userData.craft); // swap in place
+  plane.add(model);
+  plane.userData.craft = model;
+  if (plane.userData.flame) plane.userData.flame.visible = craft.id === 'rocket';
+  return craft;
 }
 
 // ----------------------------------------------------------------- input

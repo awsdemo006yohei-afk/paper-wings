@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt } from './logic.js';
-import { World, makePlane, installRocket, Input } from './game.js';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
@@ -11,6 +11,7 @@ const els = {
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
   best: $('best'), share: $('share'), again: $('again'),
+  craftPrev: $('craftPrev'), craftNext: $('craftNext'), craftName: $('craftName'),
   flash: $('flash'),
 };
 
@@ -38,7 +39,6 @@ scene.add(sunLight);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 500);
 const plane = makePlane();
 scene.add(plane);
-installRocket(plane).catch(() => {}); // same-origin asset; if it ever fails the craft stays flame-only, never a crash
 const world = new World(scene, theme);
 const input = new Input(renderer.domElement);
 
@@ -81,6 +81,25 @@ function showOver(total) {
 
 els.go.addEventListener('click', () => reset());
 els.again.addEventListener('click', () => reset());
+
+// hangar: pick your craft — curated, family-friendly models only
+const CRAFT_KEY = 'paperWings.craft';
+let craftId = localStorage.getItem(CRAFT_KEY);
+if (!CRAFTS.some((c) => c.id === craftId)) craftId = CRAFTS[0].id;
+function applyCraft() {
+  installCraft(plane, craftId, theme)
+    .then((c) => { els.craftName.textContent = c.name; })
+    .catch(() => {}); // a failed asset load must never take the game down
+}
+function cycleCraft(d) {
+  const i = CRAFTS.findIndex((c) => c.id === craftId);
+  craftId = CRAFTS[(i + d + CRAFTS.length) % CRAFTS.length].id;
+  localStorage.setItem(CRAFT_KEY, craftId);
+  applyCraft();
+}
+els.craftPrev.addEventListener('click', () => cycleCraft(-1));
+els.craftNext.addEventListener('click', () => cycleCraft(1));
+applyCraft();
 
 // ?play=1 (from the root landing): straight into the air, no title panel.
 // The start panel ships hidden so it never flashes while the modules load.

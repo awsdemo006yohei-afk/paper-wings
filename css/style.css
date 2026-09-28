@@ -39,6 +39,11 @@ button {
 button.primary { background: var(--accent); color: #fff; }
 button.primary:hover { filter: brightness(1.05); }
 
+#hangar { display: flex; align-items: center; gap: 12px; justify-content: center; margin-top: 14px; }
+#hangar button { padding: 4px 12px; background: var(--paper); border: 1px solid rgba(42, 36, 64, .2); }
+#hangar button:hover { background: #f1ebdd; }
+#hangar span { min-width: 130px; text-align: center; font-weight: 700; }
+
 /* Ad slots: hidden until a network is wired — layout already reserves space. */
 .adslot { min-height: 60px; margin-top: 18px; display: flex; align-items: center; justify-content: center; }
 .adslot:empty { visibility: hidden; }
