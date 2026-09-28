@@ -1,0 +1,125 @@
+import assert from 'node:assert/strict';
+import {
+  rng, hashSeed, dailyTheme, newScore, applyScore, rankFor,
+  planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt,
+  CORRIDOR, RING_BONUS, NEAR_MISS_BONUS,
+} from '../js/logic.js';
+
+let passed = 0;
+const fails = [];
+async function test(name, fn) {
+  try { await fn(); passed++; console.log(`  ok  ${name}`); }
+  catch (e) { fails.push(name); console.log(`# FAIL ${name}\n#       ${e.message}`); }
+}
+
+await test('rng is deterministic for the same seed', () => {
+  const a = rng(42), b = rng(42);
+  for (let i = 0; i < 100; i++) assert.equal(a(), b());
+});
+await test('rng values stay in [0,1)', () => {
+  const r = rng(7);
+  for (let i = 0; i < 1000; i++) { const v = r(); assert.ok(v >= 0 && v < 1); }
+});
+await test('hashSeed is stable and spreads', () => {
+  assert.equal(hashSeed('paper-wings:2026-09-28'), hashSeed('paper-wings:2026-09-28'));
+  assert.notEqual(hashSeed('2026-09-28'), hashSeed('2026-09-29'));
+});
+await test('dailyTheme: same date, same sky — different date, (very likely) different name', () => {
+  const a = dailyTheme('2026-09-28'), b = dailyTheme('2026-09-28'), c = dailyTheme('2026-09-29');
+  assert.equal(a.name, b.name);
+  assert.deepEqual(a.palette, b.palette);
+  assert.equal(a.wind, b.wind);
+  assert.notEqual(a.name, c.name);
+});
+await test('dailyTheme: wind stays in a sane band and name is two words', () => {
+  for (let d = 1; d <= 28; d++) {
+    const t = dailyTheme(`2026-02-${String(d).padStart(2, '0')}`);
+    assert.ok(t.wind >= 0.85 && t.wind <= 1.25, `wind ${t.wind} out of band on day ${d}`);
+    assert.equal(t.name.split(' ').length, 2);
+    assert.ok(t.palette.skyTop && t.palette.accent);
+  }
+});
+await test('scoring: distance accumulates, ring/near-miss bonuses add', () => {
+  const s = newScore();
+  applyScore(s, { meters: 10 });
+  applyScore(s, { meters: 5.5, ring: true });
+  applyScore(s, { nearMiss: true });
+  assert.equal(s.rings, 1);
+  assert.equal(s.nearMisses, 1);
+  assert.equal(s.total, 15 + RING_BONUS + NEAR_MISS_BONUS);
+});
+await test('rankFor climbs with score', () => {
+  assert.equal(rankFor(0), 'Gust Guest');
+  assert.equal(rankFor(300), 'Breezy Cadet');
+  assert.equal(rankFor(9500), 'Wing Poet');
+});
+const OBSTACLE_TYPES_SAFE = ['box', 'blade', 'ring'];
+await test('planStretch is deterministic and in-bounds', () => {
+  const a = planStretch('seed-x', 3, 0.5), b = planStretch('seed-x', 3, 0.5);
+  assert.deepEqual(a, b);
+  for (const it of a) {
+    assert.ok(OBSTACLE_TYPES_SAFE.includes(it.type), `bad type ${it.type}`);
+    assert.ok(Math.abs(it.x) <= CORRIDOR.halfWidth - 3 + 1e-9);
+    assert.ok(it.y >= CORRIDOR.bottom && it.y <= CORRIDOR.top);
+    assert.ok(it.z < 0);
+  }
+});
+await test('harder stretches get denser', () => {
+  const easy = planStretch('s', 2, 0).length;
+  const hard = planStretch('s', 2, 1).length;
+  assert.ok(hard >= easy);
+});
+await test('collision: direct overlap hits, clear distance does not', () => {
+  const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };
+  assert.ok(collides({ x: 0.5, y: 0, z: 0 }, box));
+  assert.ok(!collides({ x: 10, y: 0, z: 0 }, box));
+});
+await test('ring: center passes free, rim hits', () => {
+  const ring = { type: 'ring', x: 0, y: 0, z: 0, size: 3.2 };
+  assert.ok(!collides({ x: 0, y: 0, z: 0 }, ring), 'center should be free');
+  assert.ok(ringPass({ x: 0, y: 0, z: 0 }, ring));
+  assert.ok(collides({ x: 2.4, y: 0, z: 0 }, ring), 'rim should hit');
+  assert.ok(!ringPass({ x: 2.6, y: 0, z: 0 }, ring));
+});
+await test('near-miss fires just outside, not far away', () => {
+  const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };
+  assert.ok(nearMiss({ x: 4.5, y: 0, z: 0 }, box));
+  assert.ok(!nearMiss({ x: 30, y: 0, z: 0 }, box));
+  assert.ok(!nearMiss({ x: 0.5, y: 0, z: 0 }, box), 'overlap is a hit, not a near miss');
+});
+await test('difficulty and speed curves rise monotonically', () => {
+  let lastD = -1, lastS = -1;
+  for (let m = 0; m <= 5000; m += 250) {
+    const d = difficultyAt(m), s = speedAt(m, 1);
+    assert.ok(d >= lastD); assert.ok(s >= lastS);
+    lastD = d; lastS = s;
+  }
+  assert.equal(difficultyAt(4000), 1);
+});
+await test('daily wind applies to speed', () => {
+  assert.ok(speedAt(0, 1.2) > speedAt(0, 0.9));
+});
+
+await test('World.reset restores the opening field for runs 2+', async () => {
+  const { World } = await import('../js/game.js');
+  const stubScene = { add() {}, remove() {} };
+  const theme = { seed: 42, palette: { accent: 0xff6b6b, sun: 0xffd98e, fog: 0xffffff, skyTop: '#fff', skyBot: '#000' } };
+  const w = new World(stubScene, theme);
+  // simulate a long run: plane 2km out, scenery wrapped to trail it, obstacles spawned
+  const plane = { x: 0, y: 0, z: -2000 };
+  for (const m of [...w.ridges, ...w.clouds]) m.position.z = plane.z + 100; // behind the plane → will wrap
+  w.ensureAhead(plane.z);
+  w.update(plane, 0.016, () => {}, () => {}, () => {});
+  assert.ok(w.ridges.every((m) => m.position.z < -2000), 'scenery trailed the far-out plane');
+  w.reset();
+  assert.equal(w.items.length, 0, 'field cleared');
+  assert.equal(w.stretchIndex, 0, 'generation restarted');
+  assert.ok(w.ridges.every((m, i) => m.position.equals(w.sceneryHome[i].p)), 'mountains back at the start');
+  assert.ok(w.clouds.every((m, i) => m.position.equals(w.sceneryHome[w.ridges.length + i].p)), 'clouds back at the start');
+  // and the regenerated field covers the same opening stretch as a fresh boot
+  w.ensureAhead(0);
+  assert.ok(w.items.some((e) => e.def.z < -120), 'obstacles near the opening stretch');
+});
+
+console.log(`\n${passed} passed, ${fails.length} failed`);
+process.exit(fails.length ? 1 : 0);
