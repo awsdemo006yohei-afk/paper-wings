@@ -100,5 +100,26 @@ await test('daily wind applies to speed', () => {
   assert.ok(speedAt(0, 1.2) > speedAt(0, 0.9));
 });
 
+await test('World.reset restores the opening field for runs 2+', async () => {
+  const { World } = await import('../js/game.js');
+  const stubScene = { add() {}, remove() {} };
+  const theme = { seed: 42, palette: { accent: 0xff6b6b, sun: 0xffd98e, fog: 0xffffff, skyTop: '#fff', skyBot: '#000' } };
+  const w = new World(stubScene, theme);
+  // simulate a long run: plane 2km out, scenery wrapped to trail it, obstacles spawned
+  const plane = { x: 0, y: 0, z: -2000 };
+  for (const m of [...w.ridges, ...w.clouds]) m.position.z = plane.z + 100; // behind the plane → will wrap
+  w.ensureAhead(plane.z);
+  w.update(plane, 0.016, () => {}, () => {}, () => {});
+  assert.ok(w.ridges.every((m) => m.position.z < -2000), 'scenery trailed the far-out plane');
+  w.reset();
+  assert.equal(w.items.length, 0, 'field cleared');
+  assert.equal(w.stretchIndex, 0, 'generation restarted');
+  assert.ok(w.ridges.every((m, i) => m.position.equals(w.sceneryHome[i].p)), 'mountains back at the start');
+  assert.ok(w.clouds.every((m, i) => m.position.equals(w.sceneryHome[w.ridges.length + i].p)), 'clouds back at the start');
+  // and the regenerated field covers the same opening stretch as a fresh boot
+  w.ensureAhead(0);
+  assert.ok(w.items.some((e) => e.def.z < -120), 'obstacles near the opening stretch');
+});
+
 console.log(`\n${passed} passed, ${fails.length} failed`);
 process.exit(fails.length ? 1 : 0);

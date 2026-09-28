@@ -54,6 +54,8 @@ export class World {
     );
     sun.position.set(-30, 34, -420);
     this.scene.add(sun);
+    // home transforms so a fresh run can restore the opening landscape
+    this.sceneryHome = [...this.ridges, ...this.clouds].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
   }
 
   /** Clear the field and generation state for a fresh run. */
@@ -61,6 +63,12 @@ export class World {
     for (const e of this.items) this.recycle(e);
     this.items.length = 0;
     this.stretchIndex = 0;
+    // scenery: without this the mountains/clouds sit kilometers past the new
+    // start (they only wrap when passed), leaving runs 2+ with an empty field
+    for (const h of this.sceneryHome) {
+      h.m.position.copy(h.p);
+      h.m.rotation.copy(h.r);
+    }
   }
 
   // ------------------------------------------------------------ obstacles
