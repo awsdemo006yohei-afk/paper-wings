@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt } from './logic.js';
-import { World, makePlane, Input } from './game.js';
+import { World, makePlane, installRocket, Input } from './game.js';
 import { renderCard, shareCard } from './share.js';
 import { showBanner, showInterstitial } from './ads.js';
 
@@ -36,8 +36,9 @@ sunLight.position.set(-20, 40, -30);
 scene.add(sunLight);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 500);
-const plane = makePlane(theme);
+const plane = makePlane();
 scene.add(plane);
+installRocket(plane).catch(() => {}); // same-origin asset; if it ever fails the craft stays flame-only, never a crash
 const world = new World(scene, theme);
 const input = new Input(renderer.domElement);
 

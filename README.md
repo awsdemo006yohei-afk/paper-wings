@@ -1,6 +1,6 @@
 # Paper Wings
 
-A one-button 3D paper-plane endless flyer. Hold to rise, release to dive, steer with your pointer. Thread golden rings, graze blades for near-miss bonuses, don't fold.
+A one-button 3D paper-rocket endless flyer. Hold to rise, release to dive, steer with your pointer. Thread golden rings, graze blades for near-miss bonuses, don't fold.
 
 **Every day has its own sky** — the palette, the wind, and the world are seeded from the date, so everyone flying that day flies the same sky. Come back tomorrow for a new one.
 

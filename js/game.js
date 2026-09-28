@@ -1,5 +1,6 @@
 // Paper Wings — the world. three.js scene, pooled obstacles, one-button input.
 import * as THREE from './three.module.min.js';
+import { GLTFLoader } from './lib/GLTFLoader.js';
 import {
   CORRIDOR, planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt,
 } from './logic.js';
@@ -139,36 +140,34 @@ export class World {
 
 // ------------------------------------------------------------------ plane
 
-export function makePlane(theme) {
+export function makePlane() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xfff8ef, roughness: 0.55, flatShading: true });
-  const accent = new THREE.MeshStandardMaterial({ color: theme.palette.accent, roughness: 0.5, flatShading: true });
-  // paper rocket, nose pointing -Z (flight direction)
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 2.2, 8), mat);
-  body.rotation.x = -Math.PI / 2; // narrow end toward the nose
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.9, 8), accent);
-  nose.rotation.x = -Math.PI / 2;
-  nose.position.z = -1.55;
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2 + Math.PI / 2;
-    const fin = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0.25, -0.45), new THREE.Vector3(0, 0.25, 0.55), new THREE.Vector3(0, 1.05, 0.55),
-    ]), accent);
-    fin.geometry.setIndex([0, 1, 2]);
-    fin.geometry.computeVertexNormals();
-    fin.material = fin.material.clone();
-    fin.material.side = THREE.DoubleSide;
-    fin.position.set(Math.cos(a) * 0.48, Math.sin(a) * 0.48, 0.75);
-    fin.rotation.z = a;
-    g.add(fin);
-  }
   const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 8), new THREE.MeshBasicMaterial({ color: 0xffc46b }));
   flame.rotation.x = Math.PI / 2; // apex toward +Z (trailing)
-  flame.position.z = 1.55;
+  flame.position.z = 1.7;
   g.userData.flame = flame;
-  g.add(body, nose, flame);
+  g.add(flame);
   g.rotation.x = 0.06;
   return g;
+}
+
+/** Load the Blender paper rocket (assets/rocket.glb) and fit it as the craft: nose toward -Z, ~3.4 units long. */
+export function installRocket(plane) {
+  return new Promise((resolve, reject) => {
+    new GLTFLoader().load('assets/rocket.glb', (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center); // pivot at the middle of the craft
+      const fit = new THREE.Group();
+      fit.rotation.x = -Math.PI / 2; // asset is authored +Y-up → nose to -Z
+      fit.scale.setScalar(3.4 / size.y);
+      fit.add(model);
+      plane.add(fit);
+      resolve(plane);
+    }, undefined, reject);
+  });
 }
 
 // ----------------------------------------------------------------- input
