@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   rng, hashSeed, dailyTheme, newScore, applyScore, rankFor,
-  planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt,
+  planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt, ringPoints,
   CORRIDOR, RING_BONUS, NEAR_MISS_BONUS,
 } from '../js/logic.js';
 
@@ -42,11 +42,22 @@ await test('dailyTheme: wind stays in a sane band and name is two words', () => 
 await test('scoring: distance accumulates, ring/near-miss bonuses add', () => {
   const s = newScore();
   applyScore(s, { meters: 10 });
-  applyScore(s, { meters: 5.5, ring: true });
+  applyScore(s, { meters: 5.5, ring: RING_BONUS });
   applyScore(s, { nearMiss: true });
   assert.equal(s.rings, 1);
   assert.equal(s.nearMisses, 1);
   assert.equal(s.total, 15 + RING_BONUS + NEAR_MISS_BONUS);
+});
+await test('ring combo doubles on clean passes (50, 100, 200) and resets on a miss', () => {
+  assert.equal(ringPoints(1), 50);
+  assert.equal(ringPoints(2), 100);
+  assert.equal(ringPoints(3), 200);
+  const s = newScore();
+  for (const c of [1, 2, 3]) applyScore(s, { ring: ringPoints(c) });
+  assert.equal(s.ringBonus, 350);
+  s.combo = 0; // a ring slipped past unflown
+  applyScore(s, { ring: ringPoints(s.combo + 1) });
+  assert.equal(s.ringBonus, 400, 'chain restarts at 50 after a miss');
 });
 await test('rankFor climbs with score', () => {
   assert.equal(rankFor(0), 'Gust Guest');
@@ -78,6 +89,23 @@ await test('the run salt reshuffles traffic; stretch 0 opens with a welcome ring
   assert.equal(ring.x, 0);
   assert.equal(ring.y, 8);
   assert.equal(ring.z, -20, 'first ring ~1s ahead of the spawn line');
+  assert.equal(ring.start, true, 'first ring is the START gate that unlocks controls');
+});
+await test('rings have a clean approach: no obstacle within ±28 z-units', () => {
+  for (const salt of [1, 7, 42, 999]) {
+    for (const diff of [0, 0.5, 1]) {
+      const items = planStretch('runway-seed', 4, diff, salt);
+      for (const ring of items.filter((i) => i.type === 'ring')) {
+        for (const it of items) {
+          if (it.type === 'ring') continue;
+          assert.ok(
+            Math.abs(it.z - ring.z) >= 28,
+            `box/blade at ${it.z.toFixed(1)} crowds ring at ${ring.z.toFixed(1)}`,
+          );
+        }
+      }
+    }
+  }
 });
 await test('collision: direct overlap hits, clear distance does not', () => {
   const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };

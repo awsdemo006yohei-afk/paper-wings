@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
-import { dailyTheme, newScore, applyScore, rankFor, speedAt } from './logic.js';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js';
+import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints } from './logic.js?v=13';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=13';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
@@ -24,6 +24,8 @@ const SITE_URL = `${location.origin}${location.pathname}`;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; // craft + obstacles drop shadows on the cloud floor
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 $('gl').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -34,12 +36,25 @@ scene.fog = new THREE.Fog(p.fog, 60, 340);
 scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(p.skyBot), 1.4));
 const sunLight = new THREE.DirectionalLight(p.sun, 1.6);
 sunLight.position.set(-20, 40, -30);
-scene.add(sunLight);
+// shadows: one tight ortho frustum that travels with the plane (endless world)
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(1024, 1024);
+Object.assign(sunLight.shadow.camera, { near: 5, far: 160, left: -42, right: 42, top: 42, bottom: -42 });
+sunLight.shadow.normalBias = 0.4; // flat-shaded paper needs the slack, or stripes appear
+scene.add(sunLight, sunLight.target);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 500);
 const plane = makePlane();
 scene.add(plane);
 const world = new World(scene, theme);
+// title framing = the flight chase view, but with the craft floated above
+// the start panel so the hangar preview is actually visible. Without the
+// camera setup the idling camera sat at the world origin — INSIDE the
+// craft — and the preview rendered a dark backface blob (the jet, big
+// enough to show it, finally exposed that).
+plane.position.set(0, 13.5, 0);
+camera.position.set(0, 9.2, 11);
+camera.lookAt(0, 6, -14);
 const input = new Input(renderer.domElement);
 
 // crash marker: a pulsing ring at the exact collision point — yellow on
@@ -80,7 +95,8 @@ let score = null;
 let state = 'title'; // title | flying | crashed
 let steer = 0;
 let vy = 0;
-let spawnHold = true; // hover at takeoff until the first touch — no instant dive
+let awaitingStart = true; // controls lock until the START ring is cleared
+let touchedSinceStart = false; // gravity only joins after the player's first touch post-gate
 
 function reset() {
   score = newScore();
@@ -89,7 +105,8 @@ function reset() {
   plane.rotation.set(0.06, 0, 0);
   camera.position.set(0, 9.2, 11);
   vy = 0; steer = 0;
-  spawnHold = true;
+  awaitingStart = true;
+  touchedSinceStart = false;
   input.steerX = 0; // touch steering holds between runs — clear it on (re)start
   crashMarker.visible = false;
   crashView = false;
@@ -181,26 +198,36 @@ function frame(now) {
     plane.position.z -= speed * dt;
 
     // one button: hold = rise; otherwise gravity. Steering follows pointer X.
-    // spawn grace: the plane hovers until the first touch, so taking off on a
-    // phone (tap the button, then find the sky) never means an instant dive.
-    if (spawnHold) {
+    // START gate: until the first ring is cleared the plane flies straight
+    // and level and touch input is ignored — the opening is the same clean
+    // line for everyone, and taking off on a phone never means an instant dive.
+    if (awaitingStart) {
       vy = 0;
-      if (input.hold || input.steerX !== 0) spawnHold = false;
     } else {
-      vy += (input.hold ? 26 : -22) * dt;
+      if (input.hold || input.steerX !== 0) touchedSinceStart = true;
+      if (!touchedSinceStart) {
+        vy = 0; // coast level after the gate until the player's first touch — no surprise dive
+      } else {
+        vy += (input.hold ? 26 : -22) * dt;
+        vy = Math.max(-18, Math.min(14, vy));
+      }
     }
-    vy = Math.max(-18, Math.min(14, vy));
     plane.position.y += vy * dt;
 
-    const targetSteer = input.steerX * layout.reach;
+    const targetSteer = awaitingStart ? 0 : input.steerX * layout.reach;
     steer += (targetSteer - steer) * Math.min(1, dt * 8);
     plane.position.x += (steer - plane.position.x) * Math.min(1, dt * 12);
 
-    // banking follows vertical motion for feel
-    plane.rotation.z = THREE.MathUtils.clamp(-(steer - plane.position.x) * 0.08 - input.steerX * 0.25, -0.6, 0.6);
+    // banking follows vertical motion for feel (locked level before the gate)
+    plane.rotation.z = awaitingStart ? 0
+      : THREE.MathUtils.clamp(-(steer - plane.position.x) * 0.08 - input.steerX * 0.25, -0.6, 0.6);
     plane.rotation.x = THREE.MathUtils.clamp(0.06 + vy * 0.02, -0.4, 0.5);
     const flame = plane.userData.flame;
     if (flame) flame.scale.y = 0.85 + Math.random() * 0.4;
+
+    // keep the shadow frustum centered on the plane (same sun direction as always)
+    sunLight.position.set(plane.position.x - 20, plane.position.y + 40, plane.position.z - 30);
+    sunLight.target.position.copy(plane.position);
 
     // corridor bounds: only the VISIBLE cloud decks are crashes now (paper
     // needs sky) — steering can never reach the sides, so no wall deaths
@@ -211,9 +238,19 @@ function frame(now) {
     world.ensureAhead(plane.position.z);
     world.update(plane.position,
       dt,
-      () => { applyScore(score, { ring: true }); flash('+50'); },
+      (e) => {
+        if (e.def.start) { awaitingStart = false; flash('start'); return; } // gate, not a score
+        score.combo += 1;
+        const pts = ringPoints(score.combo);
+        applyScore(score, { ring: pts });
+        flash(score.combo > 1 ? `+${pts} ×${2 ** (score.combo - 1)}` : `+${pts}`);
+      },
       () => { applyScore(score, { nearMiss: true }); flash('thrill +10'); },
-      () => crash());
+      () => crash(),
+      () => { // ring slipped past unflown — the doubling chain breaks
+        if (score.combo > 1) flash('combo lost');
+        score.combo = 0;
+      });
 
     els.score.textContent = String(Math.floor(score.total));
 

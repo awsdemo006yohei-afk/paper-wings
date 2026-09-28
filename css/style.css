@@ -35,6 +35,7 @@ h2 { margin: 0; font-size: 20px; color: #8a8298; }
 button {
   border: 0; border-radius: 12px; padding: 12px 22px; font: inherit; font-weight: 600;
   background: #ece7f8; color: var(--ink); cursor: pointer;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; /* labels aren't text */
 }
 button.primary { background: var(--accent); color: #fff; }
 button.primary:hover { filter: brightness(1.05); }

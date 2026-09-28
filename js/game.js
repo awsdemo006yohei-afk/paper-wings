@@ -3,7 +3,7 @@ import * as THREE from './three.module.min.js';
 import { GLTFLoader } from './lib/GLTFLoader.js';
 import {
   CORRIDOR, planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt,
-} from './logic.js';
+} from './logic.js?v=13';
 
 const STRETCH_AHEAD = 3;   // keep N stretches generated ahead of the plane
 
@@ -57,13 +57,17 @@ export class World {
     sun.position.set(-30, 34, -420);
     this.scene.add(sun);
     // paper cloud decks: the floor and ceiling of the corridor, made VISIBLE —
-    // the old invisible bounds crashed planes in empty air ("hit nothing")
-    const deckMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+    // the old invisible bounds crashed planes in empty air ("hit nothing").
+    // The floor is a dusk-blue gray so the white crafts read against it, and
+    // both decks take the sun's shadows (MeshBasic can't receive them).
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x8fa3b8 });
+    const ceilMat = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
     this.decks = [];
-    for (const y of [CORRIDOR.bottom, CORRIDOR.top + 4]) {
+    for (const [y, mat] of [[CORRIDOR.bottom, floorMat], [CORRIDOR.top + 4, ceilMat]]) {
       for (let k = 0; k < 3; k++) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(110, 0.6, 130), deckMat);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(110, 0.6, 130), mat);
         m.position.set(0, y, -k * 130);
+        m.receiveShadow = true;
         this.scene.add(m);
         this.decks.push(m);
       }
@@ -111,16 +115,20 @@ export class World {
     const pooled = this.pool[type].pop();
     if (pooled) return pooled;
     if (type === 'ring') {
-      return new THREE.Mesh(
+      const ring = new THREE.Mesh(
         new THREE.TorusGeometry(3.2, 0.35, 8, 24),
         new THREE.MeshStandardMaterial({ color: this.theme.palette.accent, roughness: 0.5, metalness: 0.1 }),
       );
+      ring.castShadow = true;
+      return ring;
     }
     const mat = new THREE.MeshStandardMaterial({ color: type === 'blade' ? 0x8b93a6 : 0xfff8ef, roughness: 0.85, flatShading: true });
     const g = type === 'blade'
       ? new THREE.BoxGeometry(7, 0.5, 0.5)
       : new THREE.BoxGeometry(1, 1, 1);
-    return new THREE.Mesh(g, mat);
+    const m = new THREE.Mesh(g, mat);
+    m.castShadow = true;
+    return m;
   }
 
   recycle(entry) {
@@ -129,7 +137,7 @@ export class World {
   }
 
   /** Update obstacle spins, recycle passed items, run proximity callbacks. */
-  update(plane, dt, onRing, onNearMiss, onHit) {
+  update(plane, dt, onRing, onNearMiss, onHit, onMissed) {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const e = this.items[i];
       if (e.def.type === 'blade') { e.mesh.rotation.y += dt * 1.5; e.def.ang = e.mesh.rotation.y; } // collides() reads the bar's live angle
@@ -146,8 +154,9 @@ export class World {
         onHit(e);
         return;
       }
-      // behind the camera → recycle
+      // behind the camera → recycle (a ring that slipped past unflown is a miss)
       if (e.def.z > plane.z + 30) {
+        if (e.def.type === 'ring' && !e.passed && onMissed) onMissed(e);
         this.recycle(e);
         this.items.splice(i, 1);
       }
@@ -257,22 +266,60 @@ function buildCrane(theme) {
   return g;
 }
 
-/** Paper butterfly — twin upper/lower wing pairs, head toward -Z. */
-function buildButterfly(theme) {
+/** Fighter jet — delta-wing interceptor, nose toward -Z. */
+function buildFighterJet(theme) {
   const g = new THREE.Group();
   const { white, accent } = paperMats(theme.palette.accent);
+  const gray = new THREE.MeshStandardMaterial({ color: 0xc4cbd6, roughness: 0.55, metalness: 0, flatShading: true, side: THREE.DoubleSide });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x5d6774, roughness: 0.35, metalness: 0, flatShading: true });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x24384e, roughness: 0.15, metalness: 0 }); // no envMap: metalness would black out
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  // body along z, head forward
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.5, 6), paperMats(theme.palette.accent).white);
-  body.rotation.x = -Math.PI / 2;
+
+  // fuselage: slim hexagonal body tapering toward the nose, +Z is the tail
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 2.8, 6), gray);
+  body.rotation.x = -Math.PI / 2; // hex prism along z, small end (nose) forward
+  body.position.z = 0.35;
   g.add(body);
-  // upper wings (broad, swept back with a little lift) + lower wings (smaller)
+  // side engine intakes
   for (const s of [1, -1]) {
-    g.add(
-      tri(accent, V(s * 0.08, 0.05, 0.35), V(s * 1.4, 0.35, -0.35), V(s * 0.12, 0.02, -0.5)),
-      tri(white, V(s * 0.08, 0, -0.05), V(s * 1.0, -0.18, -0.6), V(s * 0.1, 0, -0.75)),
-    );
+    const intake = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.24, 1.15), dark);
+    intake.position.set(s * 0.32, -0.06, 0.35);
+    g.add(intake);
   }
+  // pointed nose cone
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.95, 6), gray);
+  nose.rotation.x = -Math.PI / 2; // apex toward -Z
+  nose.position.z = -1.5;
+  g.add(nose);
+  // cockpit canopy
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6), glass);
+  canopy.scale.set(1, 0.8, 2.1);
+  canopy.position.set(0, 0.2, -0.7);
+  g.add(canopy);
+  // delta wings: one flat swept triangle per side, accent tips painted on
+  for (const s of [1, -1]) {
+    g.add(tri(gray, V(s * 0.22, -0.04, -0.45), V(s * 2.0, -0.02, 1.25), V(s * 0.22, -0.04, 1.3)));
+    g.add(tri(white, V(s * 1.35, -0.03, 0.62), V(s * 2.0, -0.02, 1.25), V(s * 1.3, -0.03, 1.05))); // tip stripe
+    // wingtip missile rails
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.85, 6), accent);
+    rail.rotation.x = Math.PI / 2;
+    rail.position.set(s * 1.95, 0.02, 0.55);
+    g.add(rail);
+  }
+  // canted twin tail fins
+  for (const s of [1, -1]) {
+    g.add(tri(gray, V(s * 0.18, 0.18, 0.85), V(s * 0.5, 0.85, 1.6), V(s * 0.42, 0.18, 1.6)));
+    g.add(tri(white, V(s * 0.46, 0.72, 1.5), V(s * 0.5, 0.85, 1.6), V(s * 0.42, 0.18, 1.6))); // fin stripe
+  }
+  // horizontal stabilizers
+  for (const s of [1, -1]) {
+    g.add(tri(gray, V(s * 0.24, 0, 1.15), V(s * 0.85, 0, 1.75), V(s * 0.24, 0, 1.75)));
+  }
+  // engine nozzle
+  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.4, 6), dark);
+  nozzle.rotation.x = -Math.PI / 2;
+  nozzle.position.z = 1.95;
+  g.add(nozzle);
   return g;
 }
 
@@ -280,7 +327,7 @@ export const CRAFTS = [
   { id: 'plane', name: 'Paper Plane', build: buildPaperPlane, hitR: 1.1, verb: 'folded.' },
   { id: 'rocket', name: 'Paper Rocket', build: null, hitR: 0.55, verb: 'burned up.' }, // the Blender glTF — sharp nose slips through gaps
   { id: 'crane', name: 'Origami Crane', build: buildCrane, hitR: 0.9, verb: 'folded.' },
-  { id: 'butterfly', name: 'Paper Butterfly', build: buildButterfly, hitR: 1.05, verb: 'folded.' },
+  { id: 'jet', name: 'Fighter Jet', build: buildFighterJet, hitR: 0.85, verb: 'shot down.' },
 ];
 
 /**
@@ -297,10 +344,14 @@ export async function installCraft(plane, id, theme) {
     model = (await loadRocketScene()).clone(true);
   }
   if (plane.userData.craft) plane.remove(plane.userData.craft); // swap in place
+  model.traverse((o) => { if (o.isMesh) o.castShadow = true; }); // every craft drops a shadow
   plane.add(model);
   plane.userData.craft = model;
   plane.userData.hitR = craft.hitR ?? 1.1; // sharpness matters: the collision radius rides on the craft
-  if (plane.userData.flame) plane.userData.flame.visible = craft.id === 'rocket';
+  if (plane.userData.flame) {
+    plane.userData.flame.visible = craft.id === 'rocket' || craft.id === 'jet'; // afterburner
+    plane.userData.flame.position.z = craft.id === 'jet' ? 2.35 : 1.6; // jet's clears the nozzle
+  }
   return craft;
 }
 

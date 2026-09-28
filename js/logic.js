@@ -59,15 +59,23 @@ export const RING_BONUS = 50;
 export const NEAR_MISS_BONUS = 10;
 
 export function newScore() {
-  return { distance: 0, rings: 0, nearMisses: 0, total: 0 };
+  return { distance: 0, rings: 0, nearMisses: 0, combo: 0, ringBonus: 0, total: 0 };
 }
 
-/** Distance in meters maps 1:1; bonuses add. */
-export function applyScore(score, { meters = 0, ring = false, nearMiss = false } = {}) {
+/**
+ * Ring combo: every clean pass in a row doubles the bonus — 50, 100, 200…
+ * A ring that slips past unflown (a miss) resets the chain back to 50.
+ */
+export function ringPoints(combo) {
+  return RING_BONUS * 2 ** Math.max(0, combo - 1);
+}
+
+/** Distance in meters maps 1:1; bonuses add. `ring` is the points earned. */
+export function applyScore(score, { meters = 0, ring = 0, nearMiss = false } = {}) {
   score.distance += meters;
-  if (ring) { score.rings += 1; score.total += RING_BONUS; }
-  if (nearMiss) { score.nearMisses += 1; score.total += NEAR_MISS_BONUS; }
-  score.total = Math.floor(score.distance) + score.rings * RING_BONUS + score.nearMisses * NEAR_MISS_BONUS;
+  if (ring) { score.rings += 1; score.ringBonus += ring; }
+  if (nearMiss) { score.nearMisses += 1; }
+  score.total = Math.floor(score.distance) + score.ringBonus + score.nearMisses * NEAR_MISS_BONUS;
   return score;
 }
 
@@ -114,8 +122,21 @@ export function planStretch(seed, index, difficulty, salt = 0) {
   }
   if (index === 0) {
     // welcome ring: dead ahead of the spawn line, ~1 second in — the first
-    // thing everyone meets is a clean, centered scoring ring, not traffic
-    items.unshift({ type: 'ring', x: 0, y: 8, z: -20, size: 3.2, spin: 0 });
+    // thing everyone meets is a clean, centered scoring ring, not traffic.
+    // It's the START gate: controls lock until the plane flies through it.
+    items.unshift({ type: 'ring', x: 0, y: 8, z: -20, size: 3.2, spin: 0, start: true });
+  }
+  // rings own their approach: nothing else within ±28 z-units of a ring, so
+  // there's always a clean line in and out — players want to thread them
+  // perfectly, and a box hiding next to the rim made that a coin flip.
+  // Iterative because close rings' exclusion zones overlap.
+  for (const it of items) {
+    if (it.type === 'ring') continue;
+    for (let guard = 0; guard < 8; guard++) {
+      const ring = items.find((o) => o.type === 'ring' && Math.abs(o.z - it.z) < 28);
+      if (!ring) break;
+      it.z = ring.z + 28 + r() * 6; // shoved to the player side, met before the ring
+    }
   }
   return items;
 }
