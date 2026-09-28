@@ -55,6 +55,13 @@ export class World {
     this.scene.add(sun);
   }
 
+  /** Clear the field and generation state for a fresh run. */
+  reset() {
+    for (const e of this.items) this.recycle(e);
+    this.items.length = 0;
+    this.stretchIndex = 0;
+  }
+
   // ------------------------------------------------------------ obstacles
 
   /** Generate stretches until the track extends 360 units past the plane. */
@@ -134,22 +141,32 @@ export class World {
 
 export function makePlane(theme) {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, side: THREE.DoubleSide, flatShading: true });
-  const accent = new THREE.MeshStandardMaterial({ color: theme.palette.accent, roughness: 0.6, side: THREE.DoubleSide, flatShading: true });
-  // folded paper plane: two wings + body crease — nose points -Z (flight direction)
-  const wingL = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, 0, -1.6), new THREE.Vector3(-1.5, 0, 1.4), new THREE.Vector3(0, 0.12, 0.8),
-  ]), mat);
-  wingL.geometry.setIndex([0, 1, 2]);
-  wingL.geometry.computeVertexNormals();
-  const wingR = wingL.clone();
-  wingR.scale.x = -1;
-  const body = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, 0.1, -1.6), new THREE.Vector3(0, 0.5, 1.2), new THREE.Vector3(0, 0, 0.9),
-  ]), accent);
-  body.geometry.setIndex([0, 1, 2]);
-  body.geometry.computeVertexNormals();
-  g.add(wingL, wingR, body);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xfff8ef, roughness: 0.55, flatShading: true });
+  const accent = new THREE.MeshStandardMaterial({ color: theme.palette.accent, roughness: 0.5, flatShading: true });
+  // paper rocket, nose pointing -Z (flight direction)
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 2.2, 8), mat);
+  body.rotation.x = -Math.PI / 2; // narrow end toward the nose
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.9, 8), accent);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -1.55;
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + Math.PI / 2;
+    const fin = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0.25, -0.45), new THREE.Vector3(0, 0.25, 0.55), new THREE.Vector3(0, 1.05, 0.55),
+    ]), accent);
+    fin.geometry.setIndex([0, 1, 2]);
+    fin.geometry.computeVertexNormals();
+    fin.material = fin.material.clone();
+    fin.material.side = THREE.DoubleSide;
+    fin.position.set(Math.cos(a) * 0.48, Math.sin(a) * 0.48, 0.75);
+    fin.rotation.z = a;
+    g.add(fin);
+  }
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 8), new THREE.MeshBasicMaterial({ color: 0xffc46b }));
+  flame.rotation.x = Math.PI / 2; // apex toward +Z (trailing)
+  flame.position.z = 1.55;
+  g.userData.flame = flame;
+  g.add(body, nose, flame);
   g.rotation.x = 0.06;
   return g;
 }

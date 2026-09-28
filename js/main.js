@@ -52,8 +52,10 @@ let vy = 0;
 
 function reset() {
   score = newScore();
+  world.reset();
   plane.position.set(0, 8, 0);
   plane.rotation.set(0.06, 0, 0);
+  camera.position.set(0, 9.2, 11);
   vy = 0; steer = 0;
   state = 'flying';
   els.start.hidden = true;
@@ -110,13 +112,15 @@ function frame(now) {
     vy = Math.max(-18, Math.min(14, vy));
     plane.position.y += vy * dt;
 
-    const targetSteer = input.steerX * 14;
-    steer += (targetSteer - steer) * Math.min(1, dt * 3);
-    plane.position.x += (steer - plane.position.x) * Math.min(1, dt * 6);
+    const targetSteer = input.steerX * 18;
+    steer += (targetSteer - steer) * Math.min(1, dt * 8);
+    plane.position.x += (steer - plane.position.x) * Math.min(1, dt * 12);
 
     // banking follows vertical motion for feel
     plane.rotation.z = THREE.MathUtils.clamp(-(steer - plane.position.x) * 0.08 - input.steerX * 0.25, -0.6, 0.6);
     plane.rotation.x = THREE.MathUtils.clamp(0.06 + vy * 0.02, -0.4, 0.5);
+    const flame = plane.userData.flame;
+    if (flame) flame.scale.y = 0.85 + Math.random() * 0.4;
 
     // corridor bounds: floor/ceiling/walls are all crashes (paper needs sky)
     if (plane.position.y < -6 || plane.position.y > 30 || Math.abs(plane.position.x) > 24) crash();
