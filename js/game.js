@@ -16,6 +16,7 @@ export class World {
     this.items = [];            // active obstacles {mesh, def}
     this.pool = { box: [], blade: [], ring: [] };
     this.narrow = 1;            // portrait screens squeeze the obstacle corridor toward center
+    this.runSalt = 0;           // reshuffled every run — same sky, fresh traffic
     this.ridges = [];
     this.clouds = [];
 
@@ -55,8 +56,20 @@ export class World {
     );
     sun.position.set(-30, 34, -420);
     this.scene.add(sun);
+    // paper cloud decks: the floor and ceiling of the corridor, made VISIBLE —
+    // the old invisible bounds crashed planes in empty air ("hit nothing")
+    const deckMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+    this.decks = [];
+    for (const y of [CORRIDOR.bottom, CORRIDOR.top + 4]) {
+      for (let k = 0; k < 3; k++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(110, 0.6, 130), deckMat);
+        m.position.set(0, y, -k * 130);
+        this.scene.add(m);
+        this.decks.push(m);
+      }
+    }
     // home transforms so a fresh run can restore the opening landscape
-    this.sceneryHome = [...this.ridges, ...this.clouds].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
+    this.sceneryHome = [...this.ridges, ...this.clouds, ...this.decks].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
   }
 
   /** Clear the field and generation state for a fresh run. */
@@ -64,6 +77,7 @@ export class World {
     for (const e of this.items) this.recycle(e);
     this.items.length = 0;
     this.stretchIndex = 0;
+    this.runSalt = (Math.random() * 0xffffffff) >>> 0; // new traffic layout per run
     // scenery: without this the mountains/clouds sit kilometers past the new
     // start (they only wrap when passed), leaving runs 2+ with an empty field
     for (const h of this.sceneryHome) {
@@ -78,7 +92,7 @@ export class World {
   ensureAhead(planeZ) {
     while (this.stretchIndex * 120 < -planeZ + 360) {
       const diff = difficultyAt(-planeZ);
-      const defs = planStretch(this.seed, this.stretchIndex, diff);
+      const defs = planStretch(this.seed, this.stretchIndex, diff, this.runSalt);
       for (const d of defs) this.spawn(this.narrow === 1 ? d : { ...d, x: d.x * this.narrow });
       this.stretchIndex += 1;
     }
@@ -87,7 +101,8 @@ export class World {
   spawn(def) {
     const mesh = this.take(def.type);
     mesh.position.set(def.x, def.y, def.z);
-    mesh.rotation.z = def.spin;
+    mesh.rotation.set(0, 0, def.spin);
+    if (def.type === 'box') mesh.scale.setScalar(def.size); // visual cube matches its hitbox
     this.scene.add(mesh);
     this.items.push({ mesh, def, passed: false, missed: false });
   }
@@ -117,7 +132,7 @@ export class World {
   update(plane, dt, onRing, onNearMiss, onHit) {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const e = this.items[i];
-      if (e.def.type === 'blade') e.mesh.rotation.y += dt * 1.5;
+      if (e.def.type === 'blade') { e.mesh.rotation.y += dt * 1.5; e.def.ang = e.mesh.rotation.y; } // collides() reads the bar's live angle
       if (e.def.type === 'ring') e.mesh.rotation.z += dt * 0.4;
 
       if (!e.passed && ringPass(plane, e.def)) {
@@ -144,6 +159,9 @@ export class World {
     for (const c of this.clouds) {
       if (c.position.z > plane.z + 40) c.position.z -= 400;
     }
+    for (const d of this.decks) {
+      if (d.position.z > plane.z + 65) d.position.z -= 390;
+    }
   }
 }
 
@@ -161,27 +179,28 @@ export function makePlane() {
   return g;
 }
 
-/** Load the Blender paper rocket (assets/rocket.glb), normalized once; cloned per use. */
-let rocketScene = null;
-function loadRocketScene() {
-  if (!rocketScene) {
-    rocketScene = new Promise((resolve, reject) => {
-      new GLTFLoader().load('assets/rocket.glb', (gltf) => {
+/** Load a GLB craft asset, normalized once per path; cloned per install. */
+const glbCache = new Map(); // path → Promise<Group>
+function loadGlb(path, { upright = false } = {}) {
+  if (!glbCache.has(path)) {
+    glbCache.set(path, new Promise((resolve, reject) => {
+      new GLTFLoader().load(path, (gltf) => {
         const model = gltf.scene;
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         model.position.sub(center); // pivot at the middle of the craft
         const fit = new THREE.Group();
-        fit.rotation.x = -Math.PI / 2; // asset is authored +Y-up → nose to -Z
-        fit.scale.setScalar(3.4 / size.y);
+        fit.rotation.x = upright ? -Math.PI / 2 : 0; // authored +Y-up → nose to -Z
+        fit.scale.setScalar(3.4 / (upright ? size.y : Math.max(size.x, size.z)));
         fit.add(model);
         resolve(fit);
       }, undefined, reject);
-    });
+    }));
   }
-  return rocketScene;
+  return glbCache.get(path);
 }
+const loadRocketScene = () => loadGlb('assets/rocket.glb', { upright: true });
 
 // --------------------------------------------------------------- hangar
 
@@ -258,10 +277,10 @@ function buildButterfly(theme) {
 }
 
 export const CRAFTS = [
-  { id: 'plane', name: 'Paper Plane', build: buildPaperPlane, hitR: 1.1 },
-  { id: 'rocket', name: 'Paper Rocket', build: null, hitR: 0.55 }, // the Blender glTF — sharp nose slips through gaps
-  { id: 'crane', name: 'Origami Crane', build: buildCrane, hitR: 0.9 },
-  { id: 'butterfly', name: 'Paper Butterfly', build: buildButterfly, hitR: 1.05 },
+  { id: 'plane', name: 'Paper Plane', build: buildPaperPlane, hitR: 1.1, verb: 'folded.' },
+  { id: 'rocket', name: 'Paper Rocket', build: null, hitR: 0.55, verb: 'burned up.' }, // the Blender glTF — sharp nose slips through gaps
+  { id: 'crane', name: 'Origami Crane', build: buildCrane, hitR: 0.9, verb: 'folded.' },
+  { id: 'butterfly', name: 'Paper Butterfly', build: buildButterfly, hitR: 1.05, verb: 'folded.' },
 ];
 
 /**

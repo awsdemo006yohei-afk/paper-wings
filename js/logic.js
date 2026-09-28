@@ -90,13 +90,13 @@ export const CORRIDOR = { halfWidth: 22, bottom: -6, top: 26 };
 export const OBSTACLE_TYPES = ['box', 'blade', 'ring'];
 
 /**
- * Deterministic obstacle plan for one stretch of track.
- * `difficulty` 0..1 grows with distance; the same (seed, index, difficulty)
- * always yields the same layout, so replays/tests are stable.
+ * Obstacle plan for one stretch of track. `salt` reshuffles the layout every
+ * run (the day's sky stays themed; the traffic is fresh each flight), while
+ * the same (seed, index, salt) always yields the same layout so tests hold.
  */
-export function planStretch(seed, index, difficulty) {
-  const r = rng(hashSeed(`stretch:${seed}:${index}`));
-  const count = 4 + Math.floor(r() * 3 + difficulty * 4); // 4..10 obstacles
+export function planStretch(seed, index, difficulty, salt = 0) {
+  const r = rng(hashSeed(`stretch:${seed}:${index}:${salt}`));
+  const count = 4 + Math.floor(r() * 2 + difficulty * 6); // 4..11, thickening by the minute
   const items = [];
   for (let i = 0; i < count; i++) {
     const roll = r();
@@ -107,25 +107,48 @@ export function planStretch(seed, index, difficulty) {
       type,
       x: (r() * 2 - 1) * (CORRIDOR.halfWidth - 3),
       y: CORRIDOR.bottom + 4 + r() * (CORRIDOR.top - CORRIDOR.bottom - 8),
-      z: -(index + 1) * 120 - i * (14 - difficulty * 4) - r() * 6,
+      z: -(index + 1) * 120 - i * (15 - difficulty * 7) - r() * 6,
       size: type === 'ring' ? 3.2 : 1.6 + r() * 2.2,
       spin: r() * Math.PI * 2,
     });
   }
+  if (index === 0) {
+    // welcome ring: dead ahead of the spawn line, ~1 second in — the first
+    // thing everyone meets is a clean, centered scoring ring, not traffic
+    items.unshift({ type: 'ring', x: 0, y: 8, z: -20, size: 3.2, spin: 0 });
+  }
   return items;
 }
 
-/** Sphere-vs-obstacle overlap. Each craft brings its own hitbox radius (sharp rocket = small). */
+/**
+ * Craft-vs-obstacle overlap, matched to what the player actually SEES.
+ * The old fat spheres killed planes in mid-air next to obstacles ("hit
+ * nothing but folded") — now every shape checks its own true volume, and
+ * each craft brings its own hitbox radius (sharp rocket = small).
+ */
 export function collides(plane, item, planeR = 1.1) {
   const dx = plane.x - item.x, dy = plane.y - item.y, dz = plane.z - item.z;
-  const rr = (item.type === 'ring' ? item.size * 0.55 : item.size) + planeR;
-  // rings are forgiving: pass through the hole, only the rim hurts
-  const d2 = dx * dx + dy * dy + dz * dz;
   if (item.type === 'ring') {
+    // only the visible torus tube hurts: rim circle radius = size, tube 0.35;
+    // the hole is genuinely open — fly through the middle and nothing happens
+    if (Math.abs(dz) > 1.6) return false;
     const radial = Math.hypot(dx, dy);
-    return Math.abs(dz) < 1.6 && Math.abs(radial - item.size * 0.8) < rr * 0.5;
+    return Math.abs(radial - item.size) < 0.35 + planeR;
   }
-  return d2 < rr * rr;
+  if (item.type === 'blade') {
+    // the spinning bar as it lies RIGHT NOW (def.ang is synced each frame):
+    // closest approach from the craft to the 7-long, 0.5-thick segment
+    const c = Math.cos(item.spin || 0), s = Math.sin(item.spin || 0);
+    const ca = Math.cos(item.ang || 0), sa = Math.sin(item.ang || 0);
+    const ux = c * ca, uy = s, uz = -c * sa; // bar direction in world space
+    const t = Math.max(-3.5, Math.min(3.5, dx * ux + dy * uy + dz * uz));
+    const ex = dx - ux * t, ey = dy - uy * t, ez = dz - uz * t;
+    const rr = 0.3 + planeR;
+    return ex * ex + ey * ey + ez * ez < rr * rr;
+  }
+  // box: the mesh is a size×size×size cube — hit its faces, not a sphere around it
+  const h = item.size / 2;
+  return Math.abs(dx) < h + planeR && Math.abs(dy) < h + planeR && Math.abs(dz) < h + planeR;
 }
 
 /** Near miss: passed close by a solid obstacle (not a ring). */
@@ -144,9 +167,9 @@ export function ringPass(plane, item) {
   return Math.abs(plane.z - item.z) < 1.6 && radial < item.size * 0.55;
 }
 
-/** Difficulty curve: 0 at takeoff, approaches 1 around 4km. */
+/** Difficulty curve: 0 at takeoff, maxes ~5 minutes in (unbeatable territory). */
 export function difficultyAt(meters) {
-  return Math.min(1, meters / 4000);
+  return Math.min(1, meters / 5000);
 }
 
 /** Base forward speed (units/s) with the daily wind and distance ramp. */

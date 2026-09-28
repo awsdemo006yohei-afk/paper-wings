@@ -10,7 +10,7 @@ const els = {
   hud: $('hud'), score: $('score'), theme: $('theme'),
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
-  best: $('best'), share: $('share'), seeCrash: $('seeCrash'), flyWith: $('flyWith'),
+  best: $('best'), share: $('share'), seeCrash: $('seeCrash'), flyWith: $('flyWith'), overTitle: $('overTitle'),
   craftPrev: $('craftPrev'), craftNext: $('craftNext'), craftName: $('craftName'),
   flash: $('flash'),
 };
@@ -110,7 +110,9 @@ function crash() {
 
 function showOver(total) {
   els.finalScore.textContent = String(total);
-  els.finalDetail.textContent = `${rankFor(total)} · ${Math.floor(score.distance)} m · ${score.rings} rings · ${score.nearMisses} near misses`;
+  const craft = CRAFTS.find((c) => c.id === craftId);
+  els.overTitle.textContent = craft?.verb || 'folded.'; // every craft meets its own end
+  els.finalDetail.textContent = `${rankFor(total)} · ${Math.floor(score.distance)} m · ${score.rings} rings · ${score.nearMisses} thrills`;
   els.best.textContent = `personal best ${Math.max(best, total)}`;
   refreshFlyWith();
   els.over.hidden = false;
@@ -200,8 +202,9 @@ function frame(now) {
     const flame = plane.userData.flame;
     if (flame) flame.scale.y = 0.85 + Math.random() * 0.4;
 
-    // corridor bounds: floor/ceiling/walls are all crashes (paper needs sky)
-    if (plane.position.y < -6 || plane.position.y > 30 || Math.abs(plane.position.x) > 24) crash();
+    // corridor bounds: only the VISIBLE cloud decks are crashes now (paper
+    // needs sky) — steering can never reach the sides, so no wall deaths
+    if (plane.position.y < -6 || plane.position.y > 29.5) crash();
 
     applyScore(score, { meters: speed * dt });
 
@@ -209,7 +212,7 @@ function frame(now) {
     world.update(plane.position,
       dt,
       () => { applyScore(score, { ring: true }); flash('+50'); },
-      () => { applyScore(score, { nearMiss: true }); flash('near miss +10'); },
+      () => { applyScore(score, { nearMiss: true }); flash('thrill +10'); },
       () => crash());
 
     els.score.textContent = String(Math.floor(score.total));

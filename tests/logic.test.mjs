@@ -69,10 +69,36 @@ await test('harder stretches get denser', () => {
   const hard = planStretch('s', 2, 1).length;
   assert.ok(hard >= easy);
 });
+await test('the run salt reshuffles traffic; stretch 0 opens with a welcome ring', () => {
+  const a = planStretch('seed-x', 3, 0.5, 1), b = planStretch('seed-x', 3, 0.5, 2);
+  assert.notDeepEqual(a, b, 'different salt should give a different layout');
+  const open = planStretch('seed-x', 0, 0, 7);
+  const ring = open[0];
+  assert.equal(ring.type, 'ring');
+  assert.equal(ring.x, 0);
+  assert.equal(ring.y, 8);
+  assert.equal(ring.z, -20, 'first ring ~1s ahead of the spawn line');
+});
 await test('collision: direct overlap hits, clear distance does not', () => {
   const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };
   assert.ok(collides({ x: 0.5, y: 0, z: 0 }, box));
   assert.ok(!collides({ x: 10, y: 0, z: 0 }, box));
+});
+await test('hitboxes match the visuals (no more phantom crashes)', () => {
+  // box: faces at ±size/2 — the old fat sphere killed ~2u short of the mesh
+  const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };
+  assert.ok(collides({ x: 1.9, y: 0, z: 0 }, box), 'just inside the face');
+  assert.ok(!collides({ x: 2.2, y: 0, z: 0 }, box), 'clear of the face is clear');
+  // ring: the hole is genuinely open; only the visible tube hurts
+  const ring = { type: 'ring', x: 0, y: 0, z: 0, size: 3.2 };
+  assert.ok(!collides({ x: 1.6, y: 0, z: 0 }, ring), 'open hole, wingtip short of the tube');
+  assert.ok(!collides({ x: 0, y: 0, z: 5 }, ring), 'beyond the ring plane is free');
+  // blade: segment test — beside the bar is safe even though a sphere would hit
+  const blade = { type: 'blade', x: 0, y: 0, z: 0, spin: 0, ang: 0 };
+  assert.ok(collides({ x: 3.4, y: 0, z: 0 }, blade), 'on the bar');
+  assert.ok(!collides({ x: 3.4, y: 1.5, z: 0 }, blade), 'above the thin bar is free');
+  const turned = { type: 'blade', x: 0, y: 0, z: 0, spin: 0, ang: Math.PI / 2 };
+  assert.ok(collides({ x: 0, y: 0, z: 3.4 }, turned), 'bar follows its live angle');
 });
 await test('ring: center passes free, rim hits', () => {
   const ring = { type: 'ring', x: 0, y: 0, z: 0, size: 3.2 };
@@ -83,8 +109,8 @@ await test('ring: center passes free, rim hits', () => {
 });
 await test('per-craft hit radius: sharp rocket slips where broad plane clips', () => {
   const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };
-  // 2.8u out: inside the paper plane's reach (2+1.1=3.1), outside the rocket's (2+0.55=2.55)
-  const spot = { x: 2.8, y: 0, z: 0 };
+  // 1.9u out: the face is at 1 — plane radius 1.1 reaches it, rocket's 0.55 does not
+  const spot = { x: 1.9, y: 0, z: 0 };
   assert.ok(collides(spot, box, 1.1), 'broad paper plane clips it');
   assert.ok(!collides(spot, box, 0.55), 'sharp rocket slips past');
   // near-miss band follows the craft radius too
@@ -103,7 +129,7 @@ await test('difficulty and speed curves rise monotonically', () => {
     assert.ok(d >= lastD); assert.ok(s >= lastS);
     lastD = d; lastS = s;
   }
-  assert.equal(difficultyAt(4000), 1);
+  assert.equal(difficultyAt(5000), 1); // max difficulty ≈ 5 minutes in
 });
 await test('daily wind applies to speed', () => {
   assert.ok(speedAt(0, 1.2) > speedAt(0, 0.9));
