@@ -3,7 +3,7 @@ import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt } from './logic.js';
 import { World, makePlane, installRocket, Input } from './game.js';
 import { renderCard, shareCard } from './share.js';
-import { showBanner, showInterstitial } from './ads.js';
+import { showInterstitial } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -11,7 +11,7 @@ const els = {
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
   best: $('best'), share: $('share'), again: $('again'),
-  banner: $('bannerAd'), flash: $('flash'),
+  flash: $('flash'),
 };
 
 const dateStr = new Date().toISOString().slice(0, 10);
@@ -78,8 +78,6 @@ function showOver(total) {
   els.over.hidden = false;
   try { showInterstitial(document.getElementById('interstitialAd')); } catch {} // ads must never break the game-over flow
 }
-
-showBanner(els.banner);
 
 els.go.addEventListener('click', () => reset());
 els.again.addEventListener('click', () => reset());

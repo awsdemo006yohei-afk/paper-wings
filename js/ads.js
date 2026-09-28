@@ -1,5 +1,7 @@
 // Paper Wings — AdSense wiring. The publisher ID is public page code.
 //
+// One placement: a fresh unit in the score (game-over) modal per run.
+//
 // AdSense's `push()` throws synchronously (TagError) when the target <ins>
 // has zero available width — e.g. inside a still-hidden panel. That exception
 // must never reach game code, so: pushes only happen after layout confirms
@@ -27,16 +29,7 @@ function request(u) {
   });
 }
 
-/** Fill the start-panel banner once. */
-export function showBanner(container) {
-  if (!container || container.dataset.done) return;
-  container.dataset.done = '1';
-  const u = unit('auto');
-  container.appendChild(u);
-  request(u);
-}
-
-/** Fresh unit per game-over — call only after the over panel is visible. */
+/** Fresh unit in the score modal per game-over — call only after the panel is visible. */
 export function showInterstitial(container) {
   if (!container) return;
   const u = unit('rectangle');
