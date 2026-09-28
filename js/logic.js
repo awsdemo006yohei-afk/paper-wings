@@ -115,10 +115,10 @@ export function planStretch(seed, index, difficulty) {
   return items;
 }
 
-/** Sphere-vs-obstacle overlap. Plane hitbox radius ~1.1. */
-export function collides(plane, item) {
+/** Sphere-vs-obstacle overlap. Each craft brings its own hitbox radius (sharp rocket = small). */
+export function collides(plane, item, planeR = 1.1) {
   const dx = plane.x - item.x, dy = plane.y - item.y, dz = plane.z - item.z;
-  const rr = (item.type === 'ring' ? item.size * 0.55 : item.size) + 1.1;
+  const rr = (item.type === 'ring' ? item.size * 0.55 : item.size) + planeR;
   // rings are forgiving: pass through the hole, only the rim hurts
   const d2 = dx * dx + dy * dy + dz * dz;
   if (item.type === 'ring') {
@@ -129,11 +129,11 @@ export function collides(plane, item) {
 }
 
 /** Near miss: passed close by a solid obstacle (not a ring). */
-export function nearMiss(plane, item) {
+export function nearMiss(plane, item, planeR = 1.1) {
   if (item.type === 'ring') return false;
   const dx = plane.x - item.x, dy = plane.y - item.y, dz = plane.z - item.z;
   const d2 = dx * dx + dy * dy + dz * dz;
-  const rr = item.size + 1.1;
+  const rr = item.size + planeR;
   return d2 < (rr + 2.2) * (rr + 2.2) && d2 >= rr * rr && Math.abs(dz) < 2.5;
 }
 

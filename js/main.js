@@ -50,6 +50,7 @@ let score = null;
 let state = 'title'; // title | flying | crashed
 let steer = 0;
 let vy = 0;
+let spawnHold = true; // hover at takeoff until the first touch — no instant dive
 
 function reset() {
   score = newScore();
@@ -58,6 +59,7 @@ function reset() {
   plane.rotation.set(0.06, 0, 0);
   camera.position.set(0, 9.2, 11);
   vy = 0; steer = 0;
+  spawnHold = true;
   input.steerX = 0; // touch steering holds between runs — clear it on (re)start
   state = 'flying';
   els.start.hidden = true;
@@ -141,7 +143,14 @@ function frame(now) {
     plane.position.z -= speed * dt;
 
     // one button: hold = rise; otherwise gravity. Steering follows pointer X.
-    vy += (input.hold ? 26 : -22) * dt;
+    // spawn grace: the plane hovers until the first touch, so taking off on a
+    // phone (tap the button, then find the sky) never means an instant dive.
+    if (spawnHold) {
+      vy = 0;
+      if (input.hold || input.steerX !== 0) spawnHold = false;
+    } else {
+      vy += (input.hold ? 26 : -22) * dt;
+    }
     vy = Math.max(-18, Math.min(14, vy));
     plane.position.y += vy * dt;
 

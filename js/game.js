@@ -123,11 +123,11 @@ export class World {
       if (!e.passed && ringPass(plane, e.def)) {
         e.passed = true;
         onRing(e);
-      } else if (!e.passed && !e.missed && nearMiss(plane, e.def)) {
+      } else if (!e.passed && !e.missed && nearMiss(plane, e.def, plane.userData?.hitR)) {
         e.missed = true;
         onNearMiss(e);
       }
-      if (!e.passed && !e.missed && collides(plane, e.def)) {
+      if (!e.passed && !e.missed && collides(plane, e.def, plane.userData?.hitR)) {
         onHit(e);
         return;
       }
@@ -155,6 +155,7 @@ export function makePlane() {
   flame.rotation.x = Math.PI / 2; // apex toward +Z (trailing)
   flame.position.z = 1.6;
   g.userData.flame = flame;
+  g.userData.hitR = 1.1; // default until a craft is installed
   g.add(flame);
   g.rotation.x = 0.06;
   return g;
@@ -257,10 +258,10 @@ function buildButterfly(theme) {
 }
 
 export const CRAFTS = [
-  { id: 'plane', name: 'Paper Plane', build: buildPaperPlane },
-  { id: 'rocket', name: 'Paper Rocket', build: null }, // the Blender glTF
-  { id: 'crane', name: 'Origami Crane', build: buildCrane },
-  { id: 'butterfly', name: 'Paper Butterfly', build: buildButterfly },
+  { id: 'plane', name: 'Paper Plane', build: buildPaperPlane, hitR: 1.1 },
+  { id: 'rocket', name: 'Paper Rocket', build: null, hitR: 0.55 }, // the Blender glTF — sharp nose slips through gaps
+  { id: 'crane', name: 'Origami Crane', build: buildCrane, hitR: 0.9 },
+  { id: 'butterfly', name: 'Paper Butterfly', build: buildButterfly, hitR: 1.05 },
 ];
 
 /**
@@ -279,6 +280,7 @@ export async function installCraft(plane, id, theme) {
   if (plane.userData.craft) plane.remove(plane.userData.craft); // swap in place
   plane.add(model);
   plane.userData.craft = model;
+  plane.userData.hitR = craft.hitR ?? 1.1; // sharpness matters: the collision radius rides on the craft
   if (plane.userData.flame) plane.userData.flame.visible = craft.id === 'rocket';
   return craft;
 }

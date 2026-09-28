@@ -81,6 +81,15 @@ await test('ring: center passes free, rim hits', () => {
   assert.ok(collides({ x: 2.4, y: 0, z: 0 }, ring), 'rim should hit');
   assert.ok(!ringPass({ x: 2.6, y: 0, z: 0 }, ring));
 });
+await test('per-craft hit radius: sharp rocket slips where broad plane clips', () => {
+  const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };
+  // 2.8u out: inside the paper plane's reach (2+1.1=3.1), outside the rocket's (2+0.55=2.55)
+  const spot = { x: 2.8, y: 0, z: 0 };
+  assert.ok(collides(spot, box, 1.1), 'broad paper plane clips it');
+  assert.ok(!collides(spot, box, 0.55), 'sharp rocket slips past');
+  // near-miss band follows the craft radius too
+  assert.ok(nearMiss({ x: 2.9, y: 0, z: 0 }, box, 0.55), 'sharp craft still earns near-miss');
+});
 await test('near-miss fires just outside, not far away', () => {
   const box = { type: 'box', x: 0, y: 0, z: 0, size: 2 };
   assert.ok(nearMiss({ x: 4.5, y: 0, z: 0 }, box));
