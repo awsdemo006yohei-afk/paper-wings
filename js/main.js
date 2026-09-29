@@ -34,10 +34,10 @@ const sky = new THREE.Color(p.skyTop).lerp(new THREE.Color(p.skyBot), 0.35);
 scene.background = sky;
 scene.fog = new THREE.Fog(p.fog, 60, 340);
 scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(p.skyBot), 1.4));
-const SUN_OFF = { x: 0, y: 50, z: 0 }; // sun straight overhead: every shadow falls directly below its object
-const sunLight = new THREE.DirectionalLight(p.sun, 1.6);
+const SUN_OFF = { x: 0, y: 50, z: -6 }; // sun overhead, a touch ahead: shadows stay under their objects, and vertical rings cast a readable oval instead of a hairline
+const sunLight = new THREE.DirectionalLight(p.sun, 2.0);
 sunLight.position.set(SUN_OFF.x, SUN_OFF.y, SUN_OFF.z);
-sunLight.up.set(1, 0, 0); // lookAt-up for a vertical light — the default (0,1,0) is parallel to the view direction
+sunLight.up.set(1, 0, 0); // lookAt-up for a near-vertical light — the default (0,1,0) is nearly parallel to the view direction
 // shadows: one ortho frustum that travels with the plane (endless world) —
 // fitted to the whole visible corridor AHEAD so a shadow shows up the moment
 // its object does, never a beat later
