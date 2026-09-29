@@ -130,7 +130,7 @@ function reset() {
   world.reset();
   plane.position.set(0, 8, 0);
   plane.rotation.set(0.06, 0, 0);
-  camera.position.set(0, 10.2, 11);
+  camera.position.set(0, 9.2, 11);
   vy = 0; steer = 0;
   awaitingStart = true;
   touchedSinceStart = false;
@@ -281,12 +281,12 @@ function frame(now) {
 
     els.score.textContent = String(Math.floor(score.total));
 
-    // camera chase with lag — pitched down enough that the floor (and the
-    // plane's own shadow on it) stays in frame while the plane flies low
+    // camera chase with lag — the classic framing (a deeper pitch to show the
+    // plane's shadow read as a balance change, so it stays retired)
     camera.position.x += (plane.position.x * 0.55 - camera.position.x) * Math.min(1, dt * 4);
-    camera.position.y += (plane.position.y * 0.4 + 7 - camera.position.y) * Math.min(1, dt * 4);
+    camera.position.y += (plane.position.y * 0.4 + 6 - camera.position.y) * Math.min(1, dt * 4);
     camera.position.z = plane.position.z + layout.camDist;
-    camera.lookAt(plane.position.x * 0.5, plane.position.y * 0.5 - 6.5, plane.position.z - 14);
+    camera.lookAt(plane.position.x * 0.5, plane.position.y * 0.5 + 2, plane.position.z - 14);
   }
 
   if (state === 'crashed') {
