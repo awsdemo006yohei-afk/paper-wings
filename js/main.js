@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints } from './logic.js?v=13';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=13';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=14';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
@@ -34,14 +34,37 @@ const sky = new THREE.Color(p.skyTop).lerp(new THREE.Color(p.skyBot), 0.35);
 scene.background = sky;
 scene.fog = new THREE.Fog(p.fog, 60, 340);
 scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(p.skyBot), 1.4));
+const SUN_OFF = { x: -40, y: 50, z: -12 }; // sun up-left, slightly ahead: shadows fall right and a touch down-screen
 const sunLight = new THREE.DirectionalLight(p.sun, 1.6);
-sunLight.position.set(-20, 40, -30);
-// shadows: one tight ortho frustum that travels with the plane (endless world)
+sunLight.position.set(SUN_OFF.x, SUN_OFF.y, SUN_OFF.z);
+// shadows: one ortho frustum that travels with the plane (endless world) —
+// fitted to the whole visible corridor AHEAD so a shadow shows up the moment
+// its object does, never a beat later
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.set(1024, 1024);
-Object.assign(sunLight.shadow.camera, { near: 5, far: 160, left: -42, right: 42, top: 42, bottom: -42 });
+sunLight.shadow.mapSize.set(2048, 1024);
 sunLight.shadow.normalBias = 0.4; // flat-shaded paper needs the slack, or stripes appear
 scene.add(sunLight, sunLight.target);
+{
+  // fit the shadow box to the playable volume (plane-relative: floor to
+  // obstacle tops, plus everything ahead out to the fog line). The box is
+  // aligned to the light, so project the volume onto the light's own axes —
+  // measured from the LIGHT, not the plane (near/far run from the sun out).
+  const dir = new THREE.Vector3(-SUN_OFF.x, -SUN_OFF.y, -SUN_OFF.z).normalize();
+  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, dir);
+  const rel = new THREE.Vector3();
+  let L = 0, R = 0, B = 0, T = 0, N = 0, F = 0;
+  for (const dx of [-45, 45]) for (const dy of [-12, 34]) for (const dz of [24, -370]) {
+    rel.set(dx - SUN_OFF.x, dy - SUN_OFF.y, dz - SUN_OFF.z);
+    const s = rel.dot(right), t = rel.dot(up), u = rel.dot(dir);
+    L = Math.min(L, s); R = Math.max(R, s);
+    B = Math.min(B, t); T = Math.max(T, t);
+    N = Math.min(N, u); F = Math.max(F, u);
+  }
+  const pad = 6; // keep bias/softening from clipping box edges
+  Object.assign(sunLight.shadow.camera, { left: L - pad, right: R + pad, top: T + pad, bottom: B - pad, near: N - pad, far: F + pad });
+  sunLight.shadow.camera.updateProjectionMatrix();
+}
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 500);
 const plane = makePlane();
@@ -226,7 +249,7 @@ function frame(now) {
     if (flame) flame.scale.y = 0.85 + Math.random() * 0.4;
 
     // keep the shadow frustum centered on the plane (same sun direction as always)
-    sunLight.position.set(plane.position.x - 20, plane.position.y + 40, plane.position.z - 30);
+    sunLight.position.set(plane.position.x + SUN_OFF.x, plane.position.y + SUN_OFF.y, plane.position.z + SUN_OFF.z);
     sunLight.target.position.copy(plane.position);
 
     // corridor bounds: only the VISIBLE cloud decks are crashes now (paper

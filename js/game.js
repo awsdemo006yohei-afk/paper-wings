@@ -320,6 +320,7 @@ function buildFighterJet(theme) {
   nozzle.rotation.x = -Math.PI / 2;
   nozzle.position.z = 1.95;
   g.add(nozzle);
+  g.scale.setScalar(0.7); // sit between the paper plane and the rocket, not dwarf them
   return g;
 }
 
@@ -327,7 +328,7 @@ export const CRAFTS = [
   { id: 'plane', name: 'Paper Plane', build: buildPaperPlane, hitR: 1.1, verb: 'folded.' },
   { id: 'rocket', name: 'Paper Rocket', build: null, hitR: 0.55, verb: 'burned up.' }, // the Blender glTF — sharp nose slips through gaps
   { id: 'crane', name: 'Origami Crane', build: buildCrane, hitR: 0.9, verb: 'folded.' },
-  { id: 'jet', name: 'Fighter Jet', build: buildFighterJet, hitR: 0.85, verb: 'shot down.' },
+  { id: 'jet', name: 'Fighter Jet', build: buildFighterJet, hitR: 0.6, verb: 'shot down.' },
 ];
 
 /**
@@ -350,7 +351,7 @@ export async function installCraft(plane, id, theme) {
   plane.userData.hitR = craft.hitR ?? 1.1; // sharpness matters: the collision radius rides on the craft
   if (plane.userData.flame) {
     plane.userData.flame.visible = craft.id === 'rocket' || craft.id === 'jet'; // afterburner
-    plane.userData.flame.position.z = craft.id === 'jet' ? 2.35 : 1.6; // jet's clears the nozzle
+    plane.userData.flame.position.z = 1.6; // clears both nozzles
   }
   return craft;
 }
