@@ -241,28 +241,38 @@ function buildPaperPlane(theme) {
   return g;
 }
 
-/** Origami crane — folded bird with raised wings, nose (head) toward -Z. */
+/** Origami crane (orizuru) — diamond body, broad swept wings, long neck with
+ *  a beak kink and a sharp tail spike, nose toward -Z. */
 function buildCrane(theme) {
   const g = new THREE.Group();
   const { white, accent } = paperMats(theme.palette.accent);
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  // body: slim folded diamond along z
+  // body: folded diamond — top ridge from neck root to tail root, keel point
+  // below, two side points the wings fold from
+  const TF = V(0, 0.28, -0.5), TB = V(0, 0.28, 0.6), K = V(0, -0.5, 0.05);
+  for (const s of [1, -1]) {
+    g.add(
+      tri(white, TF, TB, V(s * 0.3, 0.05, 0.05)), // upper side facet
+      tri(white, TF, V(s * 0.3, 0.05, 0.05), K),  // lower facet down to the keel
+    );
+  }
+  // wings: one broad triangle per side, swept back, tips a touch raised
+  for (const s of [1, -1]) {
+    g.add(tri(accent, V(s * 0.12, 0.26, -0.42), V(s * 2.3, 0.6, 0.5), V(s * 0.12, 0.26, 0.55)));
+  }
+  // neck: slim spike rising forward-up, head folded down-forward at the tip;
+  // two crossing slivers so it reads from every angle, not just edge-on
+  const NK = V(0, 0.95, -1.55);
   g.add(
-    tri(white, V(0, 0.1, 0.55), V(0, 0.1, -0.75), V(0, -0.3, 0.1)),
-    tri(white, V(0, 0.1, 0.55), V(0, 0.1, -0.75), V(0.06, -0.3, 0.1)),
+    tri(white, V(-0.09, 0.24, -0.46), V(0.09, 0.24, -0.46), NK),
+    tri(white, V(0, 0.2, -0.42), V(0, 0.3, -0.54), NK),
+    tri(accent, NK, V(0, 0.8, -1.6), V(0, 0.86, -1.92)), // beak
   );
-  // wings: big raised triangles
+  // tail: matching slim spike, straight back and up
   g.add(
-    tri(accent, V(0.12, 0.05, 0.35), V(0.12, 0.05, -0.5), V(1.35, 0.75, -0.1)),
-    tri(accent, V(-0.12, 0.05, 0.35), V(-0.12, 0.05, -0.5), V(-1.35, 0.75, -0.1)),
+    tri(white, V(-0.09, 0.26, 0.56), V(0.09, 0.26, 0.56), V(0, 0.75, 1.75)),
+    tri(white, V(0, 0.22, 0.6), V(0, 0.32, 0.52), V(0, 0.75, 1.75)),
   );
-  // neck with head fold, pointing forward (-Z)
-  g.add(
-    tri(white, V(0, 0.1, -0.5), V(0, 0.42, -1.25), V(0, 0.2, -0.45)),
-    tri(accent, V(0, 0.42, -1.25), V(0, 0.62, -1.16), V(0, 0.38, -1.1)),  // beak/head
-  );
-  // tail spike
-  g.add(tri(white, V(0, 0.1, 0.65), V(0, 0.42, 1.45), V(0, 0.16, 0.6)));
   return g;
 }
 
