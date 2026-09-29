@@ -64,7 +64,7 @@ export class World {
     const ceilMat = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
     this.decks = [];
     for (const [y, mat] of [[CORRIDOR.bottom, floorMat], [CORRIDOR.top + 4, ceilMat]]) {
-      for (let k = 0; k < 3; k++) {
+      for (let k = 0; k < 4; k++) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(110, 0.6, 130), mat);
         m.position.set(0, y, -k * 130);
         m.receiveShadow = true;
@@ -169,7 +169,7 @@ export class World {
       if (c.position.z > plane.z + 40) c.position.z -= 400;
     }
     for (const d of this.decks) {
-      if (d.position.z > plane.z + 65) d.position.z -= 390;
+      if (d.position.z > plane.z + 65) d.position.z -= 520; // 4 decks: floor past the 360-unit spawn line, so shadows land the moment objects show
     }
   }
 }
