@@ -34,9 +34,10 @@ const sky = new THREE.Color(p.skyTop).lerp(new THREE.Color(p.skyBot), 0.35);
 scene.background = sky;
 scene.fog = new THREE.Fog(p.fog, 60, 340);
 scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(p.skyBot), 1.4));
-const SUN_OFF = { x: -40, y: 50, z: -12 }; // sun up-left, slightly ahead: shadows fall right and a touch down-screen
+const SUN_OFF = { x: 0, y: 50, z: 0 }; // sun straight overhead: every shadow falls directly below its object
 const sunLight = new THREE.DirectionalLight(p.sun, 1.6);
 sunLight.position.set(SUN_OFF.x, SUN_OFF.y, SUN_OFF.z);
+sunLight.up.set(1, 0, 0); // lookAt-up for a vertical light — the default (0,1,0) is parallel to the view direction
 // shadows: one ortho frustum that travels with the plane (endless world) —
 // fitted to the whole visible corridor AHEAD so a shadow shows up the moment
 // its object does, never a beat later
@@ -50,7 +51,10 @@ scene.add(sunLight, sunLight.target);
   // aligned to the light, so project the volume onto the light's own axes —
   // measured from the LIGHT, not the plane (near/far run from the sun out).
   const dir = new THREE.Vector3(-SUN_OFF.x, -SUN_OFF.y, -SUN_OFF.z).normalize();
-  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+  // straight-down light: world-up is parallel to dir, so build the basis from
+  // world-x instead — same axes sunLight.up hands the shadow camera
+  const helper = Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(dir, helper).normalize();
   const up = new THREE.Vector3().crossVectors(right, dir);
   const rel = new THREE.Vector3();
   let L = 0, R = 0, B = 0, T = 0, N = 0, F = 0;
@@ -126,7 +130,7 @@ function reset() {
   world.reset();
   plane.position.set(0, 8, 0);
   plane.rotation.set(0.06, 0, 0);
-  camera.position.set(0, 9.2, 11);
+  camera.position.set(0, 10.2, 11);
   vy = 0; steer = 0;
   awaitingStart = true;
   touchedSinceStart = false;
@@ -277,11 +281,12 @@ function frame(now) {
 
     els.score.textContent = String(Math.floor(score.total));
 
-    // camera chase with lag
+    // camera chase with lag — pitched down enough that the floor (and the
+    // plane's own shadow on it) stays in frame while the plane flies low
     camera.position.x += (plane.position.x * 0.55 - camera.position.x) * Math.min(1, dt * 4);
-    camera.position.y += (plane.position.y * 0.4 + 6 - camera.position.y) * Math.min(1, dt * 4);
+    camera.position.y += (plane.position.y * 0.4 + 7 - camera.position.y) * Math.min(1, dt * 4);
     camera.position.z = plane.position.z + layout.camDist;
-    camera.lookAt(plane.position.x * 0.5, plane.position.y * 0.5 + 2, plane.position.z - 14);
+    camera.lookAt(plane.position.x * 0.5, plane.position.y * 0.5 - 6.5, plane.position.z - 14);
   }
 
   if (state === 'crashed') {
