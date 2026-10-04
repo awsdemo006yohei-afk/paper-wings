@@ -94,10 +94,18 @@ export class World {
 
   /** Generate stretches until the track extends 360 units past the plane. */
   ensureAhead(planeZ) {
+    // on a narrowed corridor (portrait, or the capped 4:3 play strip) obstacles
+    // must fit INSIDE it — a ring or blade centered on the edge would hang half
+    // of itself out over the letterbox terrain
+    const HALF_SPAN = { ring: 3.55, blade: 3.5 }; // ring tube outer radius, blade half-length
     while (this.stretchIndex * 120 < -planeZ + 360) {
       const diff = difficultyAt(-planeZ);
       const defs = planStretch(this.seed, this.stretchIndex, diff, this.runSalt);
-      for (const d of defs) this.spawn(this.narrow === 1 ? d : { ...d, x: d.x * this.narrow });
+      for (const d of defs) {
+        if (this.narrow === 1) { this.spawn(d); continue; }
+        const room = Math.max(1, 19 * this.narrow - (d.type === 'box' ? d.size / 2 : HALF_SPAN[d.type]));
+        this.spawn({ ...d, x: Math.max(-room, Math.min(room, d.x * this.narrow)) });
+      }
       this.stretchIndex += 1;
     }
   }

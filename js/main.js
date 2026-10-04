@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints } from './logic.js?v=14';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=17';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=18';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
@@ -308,19 +308,17 @@ function flash(text) {
 }
 
 // portrait phones are a different game: pull the camera back, squeeze the
-// steering reach and the obstacle corridor into what's actually on screen
+// steering reach and the obstacle corridor into what's actually on screen.
+// Landscape caps the playfield at 4:3 even on ultrawide monitors — the extra
+// screen shows more mountains, not more obstacles (letterbox with terrain,
+// not black bars)
 const layout = { camDist: 11, reach: 18 };
 function updateLayout() {
-  if (camera.aspect >= 1) {
-    layout.camDist = 11;
-    layout.reach = 18;
-    world.narrow = 1;
-  } else {
-    layout.camDist = 11 + (1 - camera.aspect) * 10;
-    const halfW = Math.tan((camera.fov * Math.PI) / 360) * layout.camDist * camera.aspect;
-    layout.reach = Math.min(18, halfW * 0.9);
-    world.narrow = Math.min(1, (layout.reach + 1.5) / 19);
-  }
+  const playAspect = Math.min(camera.aspect, 4 / 3);
+  layout.camDist = camera.aspect >= 1 ? 11 : 11 + (1 - camera.aspect) * 10;
+  const halfW = Math.tan((camera.fov * Math.PI) / 360) * layout.camDist * playAspect;
+  layout.reach = Math.min(18, halfW * 0.9);
+  world.narrow = Math.min(1, (layout.reach + 1.5) / 19);
 }
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
