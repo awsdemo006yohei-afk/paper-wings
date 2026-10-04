@@ -63,11 +63,12 @@ export function newScore() {
 }
 
 /**
- * Ring combo: every clean pass in a row doubles the bonus — 50, 100, 200…
+ * Ring combo: each clean pass in a row adds one more RING_BONUS — 50, 100,
+ * 150, 200… (doubling ran away: a 4-streak outscored a minute of flying).
  * A ring that slips past unflown (a miss) resets the chain back to 50.
  */
 export function ringPoints(combo) {
-  return RING_BONUS * 2 ** Math.max(0, combo - 1);
+  return RING_BONUS * Math.max(1, combo);
 }
 
 /** Distance in meters maps 1:1; bonuses add. `ring` is the points earned. */

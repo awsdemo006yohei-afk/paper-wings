@@ -48,16 +48,17 @@ await test('scoring: distance accumulates, ring/near-miss bonuses add', () => {
   assert.equal(s.nearMisses, 1);
   assert.equal(s.total, 15 + RING_BONUS + NEAR_MISS_BONUS);
 });
-await test('ring combo doubles on clean passes (50, 100, 200) and resets on a miss', () => {
+await test('ring combo climbs linearly (50, 100, 150) and resets on a miss', () => {
   assert.equal(ringPoints(1), 50);
   assert.equal(ringPoints(2), 100);
-  assert.equal(ringPoints(3), 200);
+  assert.equal(ringPoints(3), 150);
+  assert.equal(ringPoints(4), 200);
   const s = newScore();
   for (const c of [1, 2, 3]) applyScore(s, { ring: ringPoints(c) });
-  assert.equal(s.ringBonus, 350);
+  assert.equal(s.ringBonus, 300);
   s.combo = 0; // a ring slipped past unflown
   applyScore(s, { ring: ringPoints(s.combo + 1) });
-  assert.equal(s.ringBonus, 400, 'chain restarts at 50 after a miss');
+  assert.equal(s.ringBonus, 350, 'chain restarts at 50 after a miss');
 });
 await test('rankFor climbs with score', () => {
   assert.equal(rankFor(0), 'Gust Guest');

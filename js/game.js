@@ -273,6 +273,7 @@ function buildCrane(theme) {
     tri(white, V(-0.09, 0.26, 0.56), V(0.09, 0.26, 0.56), V(0, 0.75, 1.75)),
     tri(white, V(0, 0.22, 0.6), V(0, 0.32, 0.52), V(0, 0.75, 1.75)),
   );
+  g.scale.setScalar(0.6); // raw build out-sizes everything — same footprint as the fighter jet
   return g;
 }
 
@@ -337,7 +338,7 @@ function buildFighterJet(theme) {
 export const CRAFTS = [
   { id: 'plane', name: 'Paper Plane', build: buildPaperPlane, hitR: 1.1, verb: 'folded.' },
   { id: 'rocket', name: 'Paper Rocket', build: null, hitR: 0.55, verb: 'burned up.' }, // the Blender glTF — sharp nose slips through gaps
-  { id: 'crane', name: 'Origami Crane', build: buildCrane, hitR: 0.9, verb: 'folded.' },
+  { id: 'crane', name: 'Origami Crane', build: buildCrane, hitR: 0.6, verb: 'folded.' },
   { id: 'jet', name: 'Fighter Jet', build: buildFighterJet, hitR: 0.6, verb: 'shot down.' },
 ];
 

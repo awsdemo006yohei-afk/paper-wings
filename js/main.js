@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
-import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints } from './logic.js?v=13';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=16';
+import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints } from './logic.js?v=14';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=17';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
@@ -270,11 +270,11 @@ function frame(now) {
         score.combo += 1;
         const pts = ringPoints(score.combo);
         applyScore(score, { ring: pts });
-        flash(score.combo > 1 ? `+${pts} ×${2 ** (score.combo - 1)}` : `+${pts}`);
+        flash(score.combo > 1 ? `+${pts} ×${score.combo}` : `+${pts}`);
       },
       () => { applyScore(score, { nearMiss: true }); flash('thrill +10'); },
       () => crash(),
-      () => { // ring slipped past unflown — the doubling chain breaks
+      () => { // ring slipped past unflown — the combo chain breaks
         if (score.combo > 1) flash('combo lost');
         score.combo = 0;
       });
