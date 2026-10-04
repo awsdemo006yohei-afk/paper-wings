@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   rng, hashSeed, dailyTheme, newScore, applyScore, rankFor,
   planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt, ringPoints,
+  themeInk, THEME_INK,
   CORRIDOR, RING_BONUS, NEAR_MISS_BONUS,
 } from '../js/logic.js';
 
@@ -38,6 +39,18 @@ await test('dailyTheme: wind stays in a sane band and name is two words', () => 
     assert.equal(t.name.split(' ').length, 2);
     assert.ok(t.palette.skyTop && t.palette.accent);
   }
+});
+await test('themeInk: every sky wears the color it says', () => {
+  assert.equal(themeInk('Glacier Lull'), '#7fd0f0');
+  assert.equal(themeInk('Not A Word', '#fff'), '#fff', 'unknown words fall back');
+  // every first word the generator can pick must have an ink (90 deterministic days)
+  for (const [m, last] of [[3, 31], [4, 30], [5, 31], [6, 30]]) {
+    for (let d = 1; d <= last; d++) {
+      const t = dailyTheme(`2026-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      assert.notEqual(themeInk(t.name, 'MISSING'), 'MISSING', `no ink for "${t.name}" — add it to THEME_INK`);
+    }
+  }
+  assert.equal(Object.keys(THEME_INK).length, 16, 'ink map stays word-for-word with SKY_WORDS');
 });
 await test('scoring: distance accumulates, ring/near-miss bonuses add', () => {
   const s = newScore();

@@ -1,6 +1,6 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
-import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints } from './logic.js?v=14';
+import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk } from './logic.js?v=15';
 import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=18';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
@@ -210,8 +210,10 @@ if (new URLSearchParams(location.search).has('play')) {
 } else {
   els.start.hidden = false;
 }
-els.theme.textContent = `today's sky — ${theme.name}`;
-document.getElementById('themeNameSlot').textContent = theme.name;
+// the sky's name wears the color it says ("Glacier Lull" in glacier blue)
+const ink = themeInk(theme.name, p.accent);
+els.theme.innerHTML = `today's sky — <span style="color:${ink}">${theme.name}</span>`;
+document.getElementById('themeNameSlot').style.color = ink;
 
 // ------------------------------------------------------------------- loop
 

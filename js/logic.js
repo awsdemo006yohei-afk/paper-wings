@@ -53,6 +53,20 @@ export function dailyTheme(dateStr) {
   return { name: `${a} ${b}`, palette, wind };
 }
 
+// The name wears its own color: the first word is the pigment ("Glacier" reads
+// glacier-blue, "Ember" ember-orange), the second is mood, not pigment.
+export const THEME_INK = {
+  Crimson: '#e8394a', Cobalt: '#3f6fe0', Copper: '#c97e45', Milk: '#f7f3e8',
+  Ember: '#ff7f3f', Glacier: '#7fd0f0', Violet: '#9d6cf2', Saffron: '#f4b62d',
+  Jade: '#3ecf95', Rose: '#ff92a6', Storm: '#8b9ab0', Honey: '#edc06d',
+  Indigo: '#6266e8', Salt: '#f1f6fa', Foxglove: '#cf7ae0', Lantern: '#ffc258',
+};
+
+/** Ink for a theme name ("Glacier Lull" → glacier blue); `fallback` otherwise. */
+export function themeInk(name, fallback = '#ffffff') {
+  return THEME_INK[name.split(' ')[0]] ?? fallback;
+}
+
 // ------------------------------------------------------------------ scoring
 
 export const RING_BONUS = 50;
