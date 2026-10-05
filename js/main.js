@@ -180,6 +180,7 @@ els.auto.addEventListener('click', () => setAutoPilot(!autoPilot));
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyZ' && !e.repeat) setAutoPilot(!autoPilot);
 });
+window.__pw = { plane, input, state: () => state, auto: () => autoPilot }; // test hook (headless verification)
 
 // hangar: pick your craft — curated, family-friendly models only
 const CRAFT_KEY = 'paperWings.craft';
