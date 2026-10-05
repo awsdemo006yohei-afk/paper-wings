@@ -1,13 +1,13 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk } from './logic.js?v=15';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=18';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=19';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  hud: $('hud'), score: $('score'),
+  hud: $('hud'), score: $('score'), auto: $('autoPilot'),
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
   best: $('best'), share: $('share'), seeCrash: $('seeCrash'), flyWith: $('flyWith'), overTitle: $('overTitle'),
@@ -124,6 +124,7 @@ let steer = 0;
 let vy = 0;
 let awaitingStart = true; // controls lock until the START ring is cleared
 let touchedSinceStart = false; // gravity only joins after the player's first touch post-gate
+let autoPilot = false; // straight & level from the current spot — Z or the HUD button
 
 function reset() {
   score = newScore();
@@ -135,6 +136,9 @@ function reset() {
   awaitingStart = true;
   touchedSinceStart = false;
   input.steerX = 0; // touch steering holds between runs — clear it on (re)start
+  input.clearKeys();
+  setAutoPilot(false);
+  els.auto.hidden = false;
   crashMarker.visible = false;
   crashView = false;
   clearTimeout(crashTimer);
@@ -164,6 +168,18 @@ function showOver(total) {
 }
 
 els.go.addEventListener('click', () => reset());
+
+// autopilot: straight and level from wherever the plane is. Z or the HUD
+// button toggles; any manual control takes over immediately.
+function setAutoPilot(v) {
+  autoPilot = v;
+  els.auto.classList.toggle('on', v);
+  els.auto.textContent = v ? 'autopilot on — z' : 'autopilot — z';
+}
+els.auto.addEventListener('click', () => setAutoPilot(!autoPilot));
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyZ' && !e.repeat) setAutoPilot(!autoPilot);
+});
 
 // hangar: pick your craft — curated, family-friendly models only
 const CRAFT_KEY = 'paperWings.craft';
@@ -225,30 +241,36 @@ function frame(now) {
     const speed = speedAt(score.distance, theme.wind);
     plane.position.z -= speed * dt;
 
-    // one button: hold = rise; otherwise gravity. Steering follows pointer X.
+    // one button: hold = rise; otherwise gravity. Steering follows pointer X
+    // or A/D / ←/→ (no S/↓ — nothing dives on purpose). Any manual control
+    // takes over from the autopilot.
+    const holding = input.hold || input.keys.rise;
+    if (autoPilot && (holding || input.keys.left || input.keys.right)) setAutoPilot(false);
+    const steerIn = input.steer(dt);
+
     // START gate: until the first ring is cleared the plane flies straight
-    // and level and touch input is ignored — the opening is the same clean
+    // and level and input is ignored — the opening is the same clean
     // line for everyone, and taking off on a phone never means an instant dive.
-    if (awaitingStart) {
-      vy = 0;
+    if (awaitingStart || autoPilot) {
+      vy = 0; // autopilot: straight and level from wherever the plane is
     } else {
-      if (input.hold || input.steerX !== 0) touchedSinceStart = true;
+      if (holding || input.steerX !== 0 || input.keySteer !== 0) touchedSinceStart = true;
       if (!touchedSinceStart) {
         vy = 0; // coast level after the gate until the player's first touch — no surprise dive
       } else {
-        vy += (input.hold ? 26 : -22) * dt;
+        vy += (holding ? 26 : -22) * dt;
         vy = Math.max(-18, Math.min(14, vy));
       }
     }
     plane.position.y += vy * dt;
 
-    const targetSteer = awaitingStart ? 0 : input.steerX * layout.reach;
+    const targetSteer = (awaitingStart || autoPilot) ? plane.position.x : steerIn * layout.reach;
     steer += (targetSteer - steer) * Math.min(1, dt * 8);
     plane.position.x += (steer - plane.position.x) * Math.min(1, dt * 12);
 
-    // banking follows vertical motion for feel (locked level before the gate)
-    plane.rotation.z = awaitingStart ? 0
-      : THREE.MathUtils.clamp(-(steer - plane.position.x) * 0.08 - input.steerX * 0.25, -0.6, 0.6);
+    // banking follows vertical motion for feel (locked level before the gate / on autopilot)
+    plane.rotation.z = (awaitingStart || autoPilot) ? 0
+      : THREE.MathUtils.clamp(-(steer - plane.position.x) * 0.08 - steerIn * 0.25, -0.6, 0.6);
     plane.rotation.x = THREE.MathUtils.clamp(0.06 + vy * 0.02, -0.4, 0.5);
     const flame = plane.userData.flame;
     if (flame) flame.scale.y = 0.85 + Math.random() * 0.4;

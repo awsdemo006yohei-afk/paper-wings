@@ -381,6 +381,8 @@ export class Input {
   constructor(el) {
     this.hold = false;
     this.steerX = 0; // -1..1 — kept on release: the plane HOLDS its lateral spot
+    this.keys = { rise: false, left: false, right: false }; // WASD minus S (nothing dives), arrows minus Down
+    this.keySteer = 0; // -1..1 — eased by keys in steer(); eases back to 0 on release
     // Touch steers by slide DIRECTION only — where the finger lands and
     // starts is irrelevant: slide left → drift left, slide right → drift
     // right, proportional to how far you slide. Stop sliding (or lift the
@@ -406,7 +408,28 @@ export class Input {
         lastX = e.clientX;
       } else if (e.pointerType !== 'touch') this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
     });
-    window.addEventListener('keydown', (e) => { if (e.code === 'Space') on(true); });
-    window.addEventListener('keyup', (e) => { if (e.code === 'Space') on(false); });
+    const RISE = ['Space', 'KeyW', 'ArrowUp'];
+    const LEFT = ['KeyA', 'ArrowLeft'];
+    const RIGHT = ['KeyD', 'ArrowRight'];
+    window.addEventListener('keydown', (e) => {
+      if (RISE.includes(e.code)) { if (e.code !== 'Space') this.keys.rise = true; on(true); e.preventDefault(); }
+      else if (LEFT.includes(e.code)) { this.keys.left = true; e.preventDefault(); }
+      else if (RIGHT.includes(e.code)) { this.keys.right = true; e.preventDefault(); }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (RISE.includes(e.code)) { if (e.code !== 'Space') this.keys.rise = false; on(false); }
+      else if (LEFT.includes(e.code)) this.keys.left = false;
+      else if (RIGHT.includes(e.code)) this.keys.right = false;
+    });
   }
+  // once per frame: ease keySteer toward the held direction (and back to 0 on
+  // release), return the combined steer input -1..1 (pointer + keys)
+  steer(dt) {
+    const target = (this.keys.right ? 1 : 0) + (this.keys.left ? -1 : 0);
+    const rate = 6; // full deflection in ~1/6 s
+    this.keySteer += Math.max(-rate * dt, Math.min(rate * dt, target - this.keySteer));
+    if (!target && Math.abs(this.keySteer) < 0.05) this.keySteer = 0;
+    return Math.max(-1, Math.min(1, this.steerX + this.keySteer));
+  }
+  clearKeys() { this.keys.rise = this.keys.left = this.keys.right = false; this.keySteer = 0; }
 }
