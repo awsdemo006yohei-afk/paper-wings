@@ -6,6 +6,7 @@ import {
 } from './logic.js?v=13';
 
 const STRETCH_AHEAD = 3;   // keep N stretches generated ahead of the plane
+const KEY_DRIFT = 0.25;    // keyboard steer speed: steerX units/s — full sweep ~4s ("move little")
 
 export class World {
   constructor(scene, theme) {
@@ -381,8 +382,7 @@ export class Input {
   constructor(el) {
     this.hold = false;
     this.steerX = 0; // -1..1 — kept on release: the plane HOLDS its lateral spot
-    this.keys = { rise: false, left: false, right: false }; // WASD minus S (nothing dives), arrows minus Down
-    this.keySteer = 0; // -1..1 — eased by keys in steer(); eases back to 0 on release
+    this.keys = { rise: false, left: false, right: false }; // W/S/↑ rise (nothing dives), A/D + ←/→ steer
     // Touch steers by slide DIRECTION only — where the finger lands and
     // starts is irrelevant: slide left → drift left, slide right → drift
     // right, proportional to how far you slide. Stop sliding (or lift the
@@ -408,7 +408,7 @@ export class Input {
         lastX = e.clientX;
       } else if (e.pointerType !== 'touch') this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
     });
-    const RISE = ['Space', 'KeyW', 'ArrowUp'];
+    const RISE = ['Space', 'KeyW', 'KeyS', 'ArrowUp'];
     const LEFT = ['KeyA', 'ArrowLeft'];
     const RIGHT = ['KeyD', 'ArrowRight'];
     window.addEventListener('keydown', (e) => {
@@ -422,14 +422,13 @@ export class Input {
       else if (RIGHT.includes(e.code)) this.keys.right = false;
     });
   }
-  // once per frame: ease keySteer toward the held direction (and back to 0 on
-  // release), return the combined steer input -1..1 (pointer + keys)
+  // once per frame: keys DRIFT the held steering spot a little (keyboard is
+  // for trim, not dodges) and never recenter — release just keeps the line,
+  // same as lifting a finger off a touch slide
   steer(dt) {
-    const target = (this.keys.right ? 1 : 0) + (this.keys.left ? -1 : 0);
-    const rate = 6; // full deflection in ~1/6 s
-    this.keySteer += Math.max(-rate * dt, Math.min(rate * dt, target - this.keySteer));
-    if (!target && Math.abs(this.keySteer) < 0.05) this.keySteer = 0;
-    return Math.max(-1, Math.min(1, this.steerX + this.keySteer));
+    const dir = (this.keys.right ? 1 : 0) + (this.keys.left ? -1 : 0);
+    if (dir) this.steerX = Math.max(-1, Math.min(1, this.steerX + dir * KEY_DRIFT * dt));
+    return this.steerX;
   }
-  clearKeys() { this.keys.rise = this.keys.left = this.keys.right = false; this.keySteer = 0; }
+  clearKeys() { this.keys.rise = this.keys.left = this.keys.right = false; }
 }

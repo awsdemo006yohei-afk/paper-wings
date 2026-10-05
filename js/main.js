@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk } from './logic.js?v=15';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=19';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=20';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
@@ -243,8 +243,8 @@ function frame(now) {
     plane.position.z -= speed * dt;
 
     // one button: hold = rise; otherwise gravity. Steering follows pointer X
-    // or A/D / ←/→ (no S/↓ — nothing dives on purpose). Any manual control
-    // takes over from the autopilot.
+    // or A/D / ←/→, which drift the held line a little and never recenter.
+    // W/S/↑ rise. Any manual control takes over from the autopilot.
     const holding = input.hold || input.keys.rise;
     if (autoPilot && (holding || input.keys.left || input.keys.right)) setAutoPilot(false);
     const steerIn = input.steer(dt);
@@ -255,7 +255,7 @@ function frame(now) {
     if (awaitingStart || autoPilot) {
       vy = 0; // autopilot: straight and level from wherever the plane is
     } else {
-      if (holding || input.steerX !== 0 || input.keySteer !== 0) touchedSinceStart = true;
+      if (holding || input.steerX !== 0 || input.keys.left || input.keys.right) touchedSinceStart = true;
       if (!touchedSinceStart) {
         vy = 0; // coast level after the gate until the player's first touch — no surprise dive
       } else {
