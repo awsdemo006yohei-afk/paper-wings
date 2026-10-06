@@ -384,7 +384,7 @@ export class Input {
   constructor(el) {
     this.hold = false;
     this.steerX = 0; // -1..1 — kept on release: the plane HOLDS its lateral spot
-    this.keys = { rise: false, left: false, right: false }; // W/S/↑ rise (nothing dives), A/D + ←/→ steer
+    this.keys = { rise: false, left: false, right: false }; // W/S/↑/↓ rise (nothing dives), A/D + ←/→ steer
     this.keyHold = 0; // seconds the current steer key has been down — drift accelerates while held
     // Touch steers by slide DIRECTION only — where the finger lands and
     // starts is irrelevant: slide left → drift left, slide right → drift
@@ -411,7 +411,7 @@ export class Input {
         lastX = e.clientX;
       } else if (e.pointerType !== 'touch') this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
     });
-    const RISE = ['Space', 'KeyW', 'KeyS', 'ArrowUp'];
+    const RISE = ['Space', 'KeyW', 'KeyS', 'ArrowUp', 'ArrowDown'];
     const LEFT = ['KeyA', 'ArrowLeft'];
     const RIGHT = ['KeyD', 'ArrowRight'];
     window.addEventListener('keydown', (e) => {
