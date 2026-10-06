@@ -70,10 +70,10 @@ export function themeInk(name, fallback = '#ffffff') {
 // ------------------------------------------------------------------ scoring
 
 export const RING_BONUS = 50;
-export const NEAR_MISS_BONUS = 10;
+export const BOOST_T = 10; // seconds of ×2 a thrill (near miss) lights or refills
 
 export function newScore() {
-  return { distance: 0, rings: 0, nearMisses: 0, combo: 0, ringBonus: 0, bonus: 0, boostT: 0, total: 0 };
+  return { distance: 0, rings: 0, nearMisses: 0, combo: 0, ringBonus: 0, boostT: 0, total: 0 };
 }
 
 /**
@@ -94,16 +94,23 @@ export function isHardRing(y) {
   return Math.abs(y - HARD_RING_BAND.center) > HARD_RING_BAND.reach;
 }
 
-/** Distance in meters maps 1:1; bonuses add. `ring` is the points earned;
- * `bonus` is loose extra points (e.g. a boosted thrill), kept out of the
- * near-miss count so the tally stays honest. */
-export function applyScore(score, { meters = 0, ring = 0, nearMiss = false, bonus = 0 } = {}) {
+/** Distance in meters maps 1:1; ring bonuses add. Near misses only count —
+ * their payoff is the ×2 boost they light (see thrillBoost), not points. */
+export function applyScore(score, { meters = 0, ring = 0, nearMiss = false } = {}) {
   score.distance += meters;
   if (ring) { score.rings += 1; score.ringBonus += ring; }
   if (nearMiss) { score.nearMisses += 1; }
-  if (bonus) { score.bonus += bonus; }
-  score.total = Math.floor(score.distance) + score.ringBonus + score.nearMisses * NEAR_MISS_BONUS + (score.bonus || 0);
+  score.total = Math.floor(score.distance) + score.ringBonus;
   return score;
+}
+
+/** A thrill ignites the ×2 boost, or — while it's already burning — fills it
+ * back UP TO a full 10s. Never stacks past 10. Returns whether it was already
+ * on (true = "refilled", false = "fresh boost"). */
+export function thrillBoost(score) {
+  const wasOn = score.boostT > 0;
+  score.boostT = BOOST_T;
+  return wasOn;
 }
 
 const RANKS = [

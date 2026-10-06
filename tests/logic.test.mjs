@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {
   rng, hashSeed, dailyTheme, newScore, applyScore, rankFor,
-  planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt, ringPoints, isHardRing,
+  planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt, ringPoints, isHardRing, thrillBoost,
   themeInk, THEME_INK,
-  CORRIDOR, RING_BONUS, NEAR_MISS_BONUS,
+  CORRIDOR, RING_BONUS, BOOST_T,
 } from '../js/logic.js';
 
 let passed = 0;
@@ -52,14 +52,14 @@ await test('themeInk: every sky wears the color it says', () => {
   }
   assert.equal(Object.keys(THEME_INK).length, 16, 'ink map stays word-for-word with SKY_WORDS');
 });
-await test('scoring: distance accumulates, ring/near-miss bonuses add', () => {
+await test('scoring: distance + rings pay; thrills only count, no points', () => {
   const s = newScore();
   applyScore(s, { meters: 10 });
   applyScore(s, { meters: 5.5, ring: RING_BONUS });
   applyScore(s, { nearMiss: true });
   assert.equal(s.rings, 1);
   assert.equal(s.nearMisses, 1);
-  assert.equal(s.total, 15 + RING_BONUS + NEAR_MISS_BONUS);
+  assert.equal(s.total, 15 + RING_BONUS, 'a thrill adds nothing to the total');
 });
 await test('ring combo climbs linearly (50, 100, 150) and resets on a miss', () => {
   assert.equal(ringPoints(1), 50);
@@ -86,12 +86,16 @@ await test('hard rings (top/bottom of the corridor) pay double', () => {
   applyScore(s, { ring: ringPoints(1, true) });
   assert.equal(s.ringBonus, 100);
 });
-await test('boosted thrill adds bonus points without inflating the count', () => {
+await test('thrillBoost: lights ×2 for 10s; refills UP TO 10, never stacks', () => {
   const s = newScore();
-  applyScore(s, { nearMiss: true, bonus: NEAR_MISS_BONUS }); // doubled thrill
-  applyScore(s, { nearMiss: true }); // normal thrill
-  assert.equal(s.nearMisses, 2);
-  assert.equal(s.total, 3 * NEAR_MISS_BONUS, 'one thrill pays 20, one pays 10');
+  assert.equal(thrillBoost(s), false, 'first thrill is a fresh boost');
+  assert.equal(s.boostT, BOOST_T);
+  s.boostT = 3; // mid-boost…
+  assert.equal(thrillBoost(s), true, 'another thrill refills, not adds');
+  assert.equal(s.boostT, BOOST_T, 'back to a full 10 — not 13');
+  s.boostT = 12; // even a stale overspill clamps to the cap on refill
+  thrillBoost(s);
+  assert.equal(s.boostT, BOOST_T);
 });
 await test('rankFor climbs with score', () => {
   assert.equal(rankFor(0), 'Gust Guest');

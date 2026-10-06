@@ -1,6 +1,6 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
-import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, NEAR_MISS_BONUS } from './logic.js?v=16';
+import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=17';
 import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=23';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
@@ -142,6 +142,7 @@ function reset() {
   // countdown on the pill says it's temporary). Engaging at t=0 felt like the
   // game grabbing the plane back — it waits for the player to not play first.
   autoArmT = performance.now();
+  autoDone = false; // every run gets its one hands-free cruise
   crashMarker.visible = false;
   crashView = false;
   clearTimeout(crashTimer);
@@ -187,11 +188,13 @@ let autoTimer = null;
 let autoCount = null;
 let autoSteerMark = 0; // steerX when autopilot engaged — any change past this means hands on
 let autoArmT = null; // takeoff timestamp — a full second of stillness arms the autopilot
+let autoDone = false; // autopilot flies once per run — after it, an idle plane dives
 function setAutoPilot(v) {
   autoPilot = v;
   clearTimeout(autoTimer);
   clearInterval(autoCount);
   if (v) {
+    autoDone = true; // spent — only an explicit Z/click brings it back after this
     autoSteerMark = input.steerX;
     let n = 0;
     els.auto.classList.add('on');
@@ -202,12 +205,9 @@ function setAutoPilot(v) {
     }, 1000);
     autoTimer = setTimeout(() => {
       setAutoPilot(false);
-      autoArmT = performance.now(); // still nobody flying? re-arm the idle watch…
       els.auto.textContent = 'autopilot off'; // the pill says it too, then settles back
       setTimeout(() => { if (!autoPilot) els.auto.textContent = `autopilot${AUTO_HINT}`; }, 1200);
       if (state === 'flying') flash('autopilot off'); // say WHY the plane started sinking
-      // …so autopilot catches the plane again a second later instead of
-      // letting it sink to the floor while the player is simply away.
     }, AUTO_T_MS);
   } else {
     els.auto.classList.remove('on');
@@ -288,8 +288,9 @@ function frame(now) {
     // steering away from where the plane sat when autopilot engaged
     if (autoPilot && (holding || input.keys.left || input.keys.right
       || Math.abs(input.steerX - autoSteerMark) > 0.02)) setAutoPilot(false);
-    // hands-free grace: a full second of stillness after takeoff arms it
-    if (autoArmT !== null) {
+    // hands-free grace: a full second of stillness after takeoff arms it —
+    // once per run; afterwards a still plane falls, it doesn't get caught
+    if (autoArmT !== null && !autoDone) {
       const idle = !input.hold && !input.keys.rise && !input.keys.left && !input.keys.right && input.steerX === 0;
       if (!idle) autoArmT = null; // touched during the grace — they're flying already
       else if (performance.now() - autoArmT >= 1000) { autoArmT = null; setAutoPilot(true); }
@@ -303,8 +304,9 @@ function frame(now) {
       vy = 0; // autopilot: straight and level from wherever the plane is
     } else {
       if (holding || input.steerX !== 0 || input.keys.left || input.keys.right) touchedSinceStart = true;
-      if (!touchedSinceStart) {
-        vy = 0; // coast level after the gate until the player's first touch — no surprise dive
+      if (!touchedSinceStart && (autoPilot || !autoDone)) {
+        vy = 0; // coast level through the gate and the one autopilot run — no surprise dive.
+        // Once that run is over, hands-off means hands-off: the plane falls like any released plane.
       } else {
         vy += (holding ? 26 : -22) * dt;
         vy = Math.max(-18, Math.min(14, vy));
@@ -343,12 +345,11 @@ function frame(now) {
         if (score.boostT > 0) pts *= 2;
         applyScore(score, { ring: pts });
         flash(score.combo > 1 ? `+${pts} ×${score.combo}` : `+${pts}`);
-        if (score.combo % 4 === 0) { score.boostT = 10; flash('×2 boost — 10s!'); } // every 4th straight ring ignites it
       },
       () => {
-        const boosted = score.boostT > 0;
-        applyScore(score, { nearMiss: true, bonus: boosted ? NEAR_MISS_BONUS : 0 }); // thrills pay double mid-boost
-        flash(boosted ? 'thrill +20 ×2' : 'thrill +10');
+        const refilled = thrillBoost(score); // a thrill lights the ×2, or fills it back up to 10s (never stacks)
+        applyScore(score, { nearMiss: true });
+        flash(refilled ? '×2 — refilled 10s' : '×2 boost — 10s!');
       },
       () => crash(),
       () => { // ring slipped past unflown — the combo chain breaks
