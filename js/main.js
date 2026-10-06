@@ -342,12 +342,10 @@ function frame(now) {
         if (e.def.start) { awaitingStart = false; flash('start'); return; } // gate, not a score
         score.combo += 1;
         const hard = isHardRing(e.def.y); // rings up top / down low pay double
-        const base = ringPoints(1, hard); // 100, or 200 for the hard ones
-        const burst = score.boostT > 0 ? 2 : 1;
-        const pts = ringPoints(score.combo, hard) * burst;
+        const pts = ringPoints(score.combo, hard) * (score.boostT > 0 ? 2 : 1);
         applyScore(score, { ring: pts });
-        // no math on screen: +100 (+100×2 mid-burst); the hard ones just say difficult
-        flash(`${hard ? 'difficult ' : '+'}${base}${burst > 1 ? '×2' : ''}`);
+        // the points you actually got: +100, +200, +300… (difficult keeps its tag)
+        flash(hard ? `difficult +${pts}` : `+${pts}`);
       },
       () => {
         const refilled = thrillBoost(score); // a thrill lights the ×2, or fills it back up to 10s (never stacks)
