@@ -150,6 +150,7 @@ function reset() {
 
 function crash() {
   state = 'crashed';
+  els.auto.hidden = true; // no autopilot to toggle when you're folded
   markCrash(plane.position);
   const total = score.total;
   if (total > best) localStorage.setItem(BEST_KEY, String(total));
@@ -171,19 +172,34 @@ els.go.addEventListener('click', () => reset());
 
 // autopilot: straight and level from wherever the plane is. Z or the HUD
 // button toggles; any manual control takes over immediately. It's a
-// breather, not a cruise: it lets go by itself after 10s.
+// breather, not a cruise: the pill counts down and it lets go after 10s —
+// "on" → 10 → 9 → … → off — so the surrender never comes as a surprise.
 const AUTO_HINT = matchMedia('(pointer: coarse)').matches ? '' : ' — z'; // no keyboard hint where there's no keyboard
 const AUTO_T_MS = 10000;
 let autoTimer = null;
+let autoCount = null;
 function setAutoPilot(v) {
   autoPilot = v;
   clearTimeout(autoTimer);
-  if (v) autoTimer = setTimeout(() => {
-    setAutoPilot(false);
-    if (state === 'flying') flash('autopilot off'); // say WHY the plane started sinking
-  }, AUTO_T_MS);
-  els.auto.classList.toggle('on', v);
-  els.auto.textContent = v ? `autopilot on${AUTO_HINT}` : `autopilot${AUTO_HINT}`;
+  clearInterval(autoCount);
+  if (v) {
+    let n = 0;
+    els.auto.classList.add('on');
+    els.auto.textContent = `autopilot on${AUTO_HINT}`;
+    autoCount = setInterval(() => {
+      n += 1;
+      if (n < AUTO_T_MS / 1000) els.auto.textContent = `autopilot ${11 - n}`; // 10 … 2, then off
+    }, 1000);
+    autoTimer = setTimeout(() => {
+      setAutoPilot(false);
+      els.auto.textContent = 'autopilot off'; // the pill says it too, then settles back
+      setTimeout(() => { if (!autoPilot) els.auto.textContent = `autopilot${AUTO_HINT}`; }, 1200);
+      if (state === 'flying') flash('autopilot off'); // say WHY the plane started sinking
+    }, AUTO_T_MS);
+  } else {
+    els.auto.classList.remove('on');
+    els.auto.textContent = `autopilot${AUTO_HINT}`;
+  }
 }
 els.auto.addEventListener('click', () => setAutoPilot(!autoPilot));
 window.addEventListener('keydown', (e) => {
