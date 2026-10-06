@@ -346,8 +346,8 @@ function frame(now) {
         const burst = score.boostT > 0 ? 2 : 1;
         const pts = ringPoints(score.combo, hard) * burst;
         applyScore(score, { ring: pts });
-        // circle point × combo × boost, never the subtotal: +100×3×2, +200×4×2, +100×5
-        flash(score.combo > 1 || burst > 1 ? `+${base}×${score.combo}${burst > 1 ? '×2' : ''}` : `+${pts}`);
+        // no math on screen: +100 (+100×2 mid-burst); the hard ones just say difficult
+        flash(`${hard ? 'difficult ' : '+'}${base}${burst > 1 ? '×2' : ''}`);
       },
       () => {
         const refilled = thrillBoost(score); // a thrill lights the ×2, or fills it back up to 10s (never stacks)
