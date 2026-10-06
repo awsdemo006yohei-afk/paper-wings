@@ -344,8 +344,8 @@ function frame(now) {
         const hard = isHardRing(e.def.y); // rings up top / down low pay double
         const pts = ringPoints(score.combo, hard) * (score.boostT > 0 ? 2 : 1);
         applyScore(score, { ring: pts });
-        // the points you actually got: +100, +200, +300… (difficult keeps its tag)
-        flash(hard ? `difficult +${pts}` : `+${pts}`);
+        // the points you actually got: +100, 2× combo +200, 3× combo +300 (difficult keeps its tag)
+        flash(hard ? `difficult +${pts}` : score.combo > 1 ? `${score.combo}× combo +${pts}` : `+${pts}`);
       },
       () => {
         const refilled = thrillBoost(score); // a thrill lights the ×2, or fills it back up to 10s (never stacks)
