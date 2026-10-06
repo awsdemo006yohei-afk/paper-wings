@@ -202,9 +202,12 @@ function setAutoPilot(v) {
     }, 1000);
     autoTimer = setTimeout(() => {
       setAutoPilot(false);
+      autoArmT = performance.now(); // still nobody flying? re-arm the idle watch…
       els.auto.textContent = 'autopilot off'; // the pill says it too, then settles back
       setTimeout(() => { if (!autoPilot) els.auto.textContent = `autopilot${AUTO_HINT}`; }, 1200);
       if (state === 'flying') flash('autopilot off'); // say WHY the plane started sinking
+      // …so autopilot catches the plane again a second later instead of
+      // letting it sink to the floor while the player is simply away.
     }, AUTO_T_MS);
   } else {
     els.auto.classList.remove('on');
