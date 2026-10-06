@@ -25,6 +25,14 @@ body { font: 15px/1.5 system-ui, -apple-system, sans-serif; color: var(--ink); b
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 #autoPilot.on { background: var(--accent); border-color: transparent; }
+/* touch devices: keep the toggle in thumb reach — bottom-right corner */
+@media (pointer: coarse) {
+  #autoPilot {
+    top: auto;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    right: calc(18px + env(safe-area-inset-right, 0px));
+  }
+}
 
 .panel {
   position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
