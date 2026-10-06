@@ -69,7 +69,7 @@ export function themeInk(name, fallback = '#ffffff') {
 
 // ------------------------------------------------------------------ scoring
 
-export const RING_BONUS = 50;
+export const RING_BONUS = 100;
 export const BOOST_T = 10; // seconds of ×2 a thrill (near miss) lights or refills
 
 export function newScore() {
@@ -77,11 +77,11 @@ export function newScore() {
 }
 
 /**
- * Ring combo: each clean pass in a row adds one more RING_BONUS — 50, 100,
- * 150, 200… (doubling ran away: a 4-streak outscored a minute of flying).
- * A ring that slips past unflown (a miss) resets the chain back to 50.
- * Rings tucked near the floor or the ceiling (`hard`) pay double — they
- * take a deliberate climb or dive to reach.
+ * Ring combo: each clean pass in a row adds one more RING_BONUS — 100, 200,
+ * 300… (linear on purpose: doubling per level ran away — a 4-streak outscored
+ * a minute of flying). A ring that slips past unflown (a miss) resets the
+ * chain back to 100. Rings tucked near the floor or the ceiling (`hard`) pay
+ * double — they take a deliberate climb or dive to reach.
  */
 export function ringPoints(combo, hard = false) {
   return RING_BONUS * (hard ? 2 : 1) * Math.max(1, combo);

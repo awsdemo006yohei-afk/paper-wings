@@ -61,22 +61,22 @@ await test('scoring: distance + rings pay; thrills only count, no points', () =>
   assert.equal(s.nearMisses, 1);
   assert.equal(s.total, 15 + RING_BONUS, 'a thrill adds nothing to the total');
 });
-await test('ring combo climbs linearly (50, 100, 150) and resets on a miss', () => {
-  assert.equal(ringPoints(1), 50);
-  assert.equal(ringPoints(2), 100);
-  assert.equal(ringPoints(3), 150);
-  assert.equal(ringPoints(4), 200);
+await test('ring combo climbs linearly (100, 200, 300) and resets on a miss', () => {
+  assert.equal(ringPoints(1), 100);
+  assert.equal(ringPoints(2), 200);
+  assert.equal(ringPoints(3), 300);
+  assert.equal(ringPoints(4), 400);
   const s = newScore();
   for (const c of [1, 2, 3]) applyScore(s, { ring: ringPoints(c) });
-  assert.equal(s.ringBonus, 300);
+  assert.equal(s.ringBonus, 600);
   s.combo = 0; // a ring slipped past unflown
   applyScore(s, { ring: ringPoints(s.combo + 1) });
-  assert.equal(s.ringBonus, 350, 'chain restarts at 50 after a miss');
+  assert.equal(s.ringBonus, 700, 'chain restarts at 100 after a miss');
 });
 await test('hard rings (top/bottom of the corridor) pay double', () => {
-  assert.equal(ringPoints(1, true), 100);
-  assert.equal(ringPoints(3, true), 300);
-  assert.equal(ringPoints(2), 100, 'normal rings unchanged');
+  assert.equal(ringPoints(1, true), 200);
+  assert.equal(ringPoints(3, true), 600);
+  assert.equal(ringPoints(2), 200, 'normal ring 2, for comparison');
   assert.equal(isHardRing(8), false, 'welcome ring sits in the easy band');
   assert.equal(isHardRing(10), false, 'band middle is easy');
   assert.equal(isHardRing(16), false, 'the boundary itself is easy');
@@ -84,7 +84,12 @@ await test('hard rings (top/bottom of the corridor) pay double', () => {
   assert.equal(isHardRing(3.9), true, 'clearly down low is hard');
   const s = newScore();
   applyScore(s, { ring: ringPoints(1, true) });
-  assert.equal(s.ringBonus, 100);
+  assert.equal(s.ringBonus, 200);
+});
+await test('the ×2 burst doubles whatever the ring was worth', () => {
+  // combo 3 mid-burst: 100×3×2; hard combo 2 mid-burst: 200×2×2
+  assert.equal(ringPoints(3) * 2, 600);
+  assert.equal(ringPoints(2, true) * 2, 800);
 });
 await test('thrillBoost: lights ×2 for 10s; refills UP TO 10, never stacks', () => {
   const s = newScore();
