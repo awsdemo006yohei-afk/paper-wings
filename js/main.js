@@ -222,24 +222,25 @@ window.addEventListener('keydown', (e) => {
 });
 window.__pw = { plane, input, state: () => state, auto: () => autoPilot }; // test hook (headless verification)
 
-// hangar: your craft — picked on the score screen ("Fly with …"); the title
-// keeps just the sky and the button
-const CRAFT_KEY = 'paperWings.craft';
-let craftId = localStorage.getItem(CRAFT_KEY);
-if (!CRAFTS.some((c) => c.id === craftId)) craftId = CRAFTS[0].id;
+// hangar: every session opens on the Paper Plane (the title says Paper
+// Wings); after that the score screen offers a random different craft
+let craftId = CRAFTS[0].id;
 function applyCraft() {
   installCraft(plane, craftId, theme).catch(() => {}); // a failed asset load must never take the game down
 }
 applyCraft();
 
-// score modal: fly with a different craft (restart) · share the card
-const nextCraft = () => CRAFTS[(CRAFTS.findIndex((c) => c.id === craftId) + 1) % CRAFTS.length];
-function refreshFlyWith() { els.flyWith.textContent = `Fly with ${nextCraft().name}`; }
+// score modal: fly with a random other craft (restart) · share the card.
+// The pick happens when the screen shows, so the button never lies.
+const pickNext = () => {
+  const others = CRAFTS.filter((c) => c.id !== craftId);
+  return others[Math.floor(Math.random() * others.length)];
+};
+let nextCraft = pickNext();
+function refreshFlyWith() { nextCraft = pickNext(); els.flyWith.textContent = `Fly with ${nextCraft.name}`; }
 els.flyWith.addEventListener('click', () => {
-  craftId = nextCraft().id;
-  localStorage.setItem(CRAFT_KEY, craftId);
+  craftId = nextCraft.id;
   applyCraft();
-  refreshFlyWith();
   reset();
 });
 const scoreCard = () => {
