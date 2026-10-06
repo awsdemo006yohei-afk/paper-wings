@@ -341,15 +341,18 @@ function frame(now) {
       (e) => {
         if (e.def.start) { awaitingStart = false; flash('start'); return; } // gate, not a score
         score.combo += 1;
-        let pts = ringPoints(score.combo, isHardRing(e.def.y)); // rings up top / down low pay double
-        if (score.boostT > 0) pts *= 2;
+        const hard = isHardRing(e.def.y); // rings up top / down low pay double
+        const base = ringPoints(1, hard); // 100, or 200 for the hard ones
+        const burst = score.boostT > 0 ? 2 : 1;
+        const pts = ringPoints(score.combo, hard) * burst;
         applyScore(score, { ring: pts });
-        flash(score.combo > 1 ? `+${pts} ×${score.combo}` : `+${pts}`);
+        // the equation, not the subtotal first: 100×3=600, mid-burst 100×3×2=600
+        flash(score.combo > 1 || burst > 1 ? `${base}×${score.combo}${burst > 1 ? '×2' : ''}=${pts}` : `+${pts}`);
       },
       () => {
         const refilled = thrillBoost(score); // a thrill lights the ×2, or fills it back up to 10s (never stacks)
         applyScore(score, { nearMiss: true });
-        flash(refilled ? '×2 — refilled 10s' : '×2 boost — 10s!');
+        if (!refilled) flash('×2 boost — 10s!'); // refills happen silently — the message stays the same
       },
       () => crash(),
       () => { // ring slipped past unflown — the combo chain breaks
