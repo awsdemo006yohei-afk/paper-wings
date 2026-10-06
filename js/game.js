@@ -6,7 +6,9 @@ import {
 } from './logic.js?v=13';
 
 const STRETCH_AHEAD = 3;   // keep N stretches generated ahead of the plane
-const KEY_DRIFT = 0.25;    // keyboard steer speed: steerX units/s — full sweep ~4s ("move little")
+const KEY_DRIFT = 0.25;      // keyboard steer speed at first press: steerX units/s — a nudge, not a dodge
+const KEY_DRIFT_MAX = 1.0;   // speed after KEY_DRIFT_T of continuous holding — keep pushing to really travel
+const KEY_DRIFT_T = 1.5;     // seconds of holding to reach full speed
 
 export class World {
   constructor(scene, theme) {
@@ -383,6 +385,7 @@ export class Input {
     this.hold = false;
     this.steerX = 0; // -1..1 — kept on release: the plane HOLDS its lateral spot
     this.keys = { rise: false, left: false, right: false }; // W/S/↑ rise (nothing dives), A/D + ←/→ steer
+    this.keyHold = 0; // seconds the current steer key has been down — drift accelerates while held
     // Touch steers by slide DIRECTION only — where the finger lands and
     // starts is irrelevant: slide left → drift left, slide right → drift
     // right, proportional to how far you slide. Stop sliding (or lift the
@@ -422,13 +425,17 @@ export class Input {
       else if (RIGHT.includes(e.code)) this.keys.right = false;
     });
   }
-  // once per frame: keys DRIFT the held steering spot a little (keyboard is
-  // for trim, not dodges) and never recenter — release just keeps the line,
-  // same as lifting a finger off a touch slide
+  // once per frame: keys DRIFT the held steering spot — gently at first, and
+  // the longer you keep the key down the faster it goes (tap = trim, hold =
+  // travel). Release never recenters: the line is kept, same as lifting a
+  // finger off a touch slide.
   steer(dt) {
     const dir = (this.keys.right ? 1 : 0) + (this.keys.left ? -1 : 0);
-    if (dir) this.steerX = Math.max(-1, Math.min(1, this.steerX + dir * KEY_DRIFT * dt));
+    if (!dir) { this.keyHold = 0; return this.steerX; }
+    this.keyHold = Math.min(this.keyHold + dt, KEY_DRIFT_T);
+    const rate = KEY_DRIFT + (KEY_DRIFT_MAX - KEY_DRIFT) * (this.keyHold / KEY_DRIFT_T);
+    this.steerX = Math.max(-1, Math.min(1, this.steerX + dir * rate * dt));
     return this.steerX;
   }
-  clearKeys() { this.keys.rise = this.keys.left = this.keys.right = false; }
+  clearKeys() { this.keys.rise = this.keys.left = this.keys.right = false; this.keyHold = 0; }
 }
