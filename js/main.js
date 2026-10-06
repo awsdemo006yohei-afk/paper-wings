@@ -73,12 +73,11 @@ const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 50
 const plane = makePlane();
 scene.add(plane);
 const world = new World(scene, theme);
-// title framing = the flight chase view, but with the craft floated above
-// the start panel so the hangar preview is actually visible. Without the
-// camera setup the idling camera sat at the world origin — INSIDE the
-// craft — and the preview rendered a dark backface blob (the jet, big
-// enough to show it, finally exposed that).
-plane.position.set(0, 13.5, 0);
+// title: just the sky — the craft waits offstage until Take flight. The
+// camera sits at the flight-start framing so the panel floats over the
+// same world you're about to fly into.
+plane.visible = false;
+plane.position.set(0, 8, 0);
 camera.position.set(0, 9.2, 11);
 camera.lookAt(0, 6, -14);
 const input = new Input(renderer.domElement);
@@ -128,6 +127,7 @@ let autoPilot = false; // straight & level from the current spot — Z or the HU
 function reset() {
   score = newScore();
   world.reset();
+  plane.visible = true;
   plane.position.set(0, 8, 0);
   plane.rotation.set(0.06, 0, 0);
   camera.position.set(0, 9.2, 11);
