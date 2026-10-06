@@ -180,6 +180,14 @@ els.auto.addEventListener('click', () => setAutoPilot(!autoPilot));
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyZ' && !e.repeat) setAutoPilot(!autoPilot);
 });
+// Enter = the panel's primary action: Take flight on the title,
+// Fly with [craft] on the score modal
+window.addEventListener('keydown', (e) => {
+  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat) {
+    if (!els.start.hidden) { e.preventDefault(); els.go.click(); }
+    else if (!els.over.hidden) { e.preventDefault(); els.flyWith.click(); }
+  }
+});
 window.__pw = { plane, input, state: () => state, auto: () => autoPilot }; // test hook (headless verification)
 
 // hangar: pick your craft — curated, family-friendly models only
