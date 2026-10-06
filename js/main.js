@@ -346,8 +346,8 @@ function frame(now) {
         const burst = score.boostT > 0 ? 2 : 1;
         const pts = ringPoints(score.combo, hard) * burst;
         applyScore(score, { ring: pts });
-        // the equation, not the subtotal first: 100×3=600, mid-burst 100×3×2=600
-        flash(score.combo > 1 || burst > 1 ? `${base}×${score.combo}${burst > 1 ? '×2' : ''}=${pts}` : `+${pts}`);
+        // circle point × combo × boost, never the subtotal: +100×3×2, +200×4×2, +100×5
+        flash(score.combo > 1 || burst > 1 ? `+${base}×${score.combo}${burst > 1 ? '×2' : ''}` : `+${pts}`);
       },
       () => {
         const refilled = thrillBoost(score); // a thrill lights the ×2, or fills it back up to 10s (never stacks)
