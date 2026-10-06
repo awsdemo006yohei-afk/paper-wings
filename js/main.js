@@ -170,11 +170,20 @@ function showOver(total) {
 els.go.addEventListener('click', () => reset());
 
 // autopilot: straight and level from wherever the plane is. Z or the HUD
-// button toggles; any manual control takes over immediately.
+// button toggles; any manual control takes over immediately. It's a
+// breather, not a cruise: it lets go by itself after 10s.
+const AUTO_HINT = matchMedia('(pointer: coarse)').matches ? '' : ' — z'; // no keyboard hint where there's no keyboard
+const AUTO_T_MS = 10000;
+let autoTimer = null;
 function setAutoPilot(v) {
   autoPilot = v;
+  clearTimeout(autoTimer);
+  if (v) autoTimer = setTimeout(() => {
+    setAutoPilot(false);
+    if (state === 'flying') flash('autopilot off'); // say WHY the plane started sinking
+  }, AUTO_T_MS);
   els.auto.classList.toggle('on', v);
-  els.auto.textContent = v ? 'autopilot on — z' : 'autopilot — z';
+  els.auto.textContent = v ? `autopilot on${AUTO_HINT}` : `autopilot${AUTO_HINT}`;
 }
 els.auto.addEventListener('click', () => setAutoPilot(!autoPilot));
 window.addEventListener('keydown', (e) => {
