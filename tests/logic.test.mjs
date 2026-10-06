@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   rng, hashSeed, dailyTheme, newScore, applyScore, rankFor,
-  planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt, ringPoints,
+  planStretch, collides, nearMiss, ringPass, difficultyAt, speedAt, ringPoints, isHardRing,
   themeInk, THEME_INK,
   CORRIDOR, RING_BONUS, NEAR_MISS_BONUS,
 } from '../js/logic.js';
@@ -72,6 +72,26 @@ await test('ring combo climbs linearly (50, 100, 150) and resets on a miss', () 
   s.combo = 0; // a ring slipped past unflown
   applyScore(s, { ring: ringPoints(s.combo + 1) });
   assert.equal(s.ringBonus, 350, 'chain restarts at 50 after a miss');
+});
+await test('hard rings (top/bottom of the corridor) pay double', () => {
+  assert.equal(ringPoints(1, true), 100);
+  assert.equal(ringPoints(3, true), 300);
+  assert.equal(ringPoints(2), 100, 'normal rings unchanged');
+  assert.equal(isHardRing(8), false, 'welcome ring sits in the easy band');
+  assert.equal(isHardRing(10), false, 'band middle is easy');
+  assert.equal(isHardRing(16), false, 'the boundary itself is easy');
+  assert.equal(isHardRing(16.1), true, 'clearly up top is hard');
+  assert.equal(isHardRing(3.9), true, 'clearly down low is hard');
+  const s = newScore();
+  applyScore(s, { ring: ringPoints(1, true) });
+  assert.equal(s.ringBonus, 100);
+});
+await test('boosted thrill adds bonus points without inflating the count', () => {
+  const s = newScore();
+  applyScore(s, { nearMiss: true, bonus: NEAR_MISS_BONUS }); // doubled thrill
+  applyScore(s, { nearMiss: true }); // normal thrill
+  assert.equal(s.nearMisses, 2);
+  assert.equal(s.total, 3 * NEAR_MISS_BONUS, 'one thrill pays 20, one pays 10');
 });
 await test('rankFor climbs with score', () => {
   assert.equal(rankFor(0), 'Gust Guest');

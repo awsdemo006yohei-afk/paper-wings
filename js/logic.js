@@ -73,24 +73,36 @@ export const RING_BONUS = 50;
 export const NEAR_MISS_BONUS = 10;
 
 export function newScore() {
-  return { distance: 0, rings: 0, nearMisses: 0, combo: 0, ringBonus: 0, total: 0 };
+  return { distance: 0, rings: 0, nearMisses: 0, combo: 0, ringBonus: 0, bonus: 0, boostT: 0, total: 0 };
 }
 
 /**
  * Ring combo: each clean pass in a row adds one more RING_BONUS — 50, 100,
  * 150, 200… (doubling ran away: a 4-streak outscored a minute of flying).
  * A ring that slips past unflown (a miss) resets the chain back to 50.
+ * Rings tucked near the floor or the ceiling (`hard`) pay double — they
+ * take a deliberate climb or dive to reach.
  */
-export function ringPoints(combo) {
-  return RING_BONUS * Math.max(1, combo);
+export function ringPoints(combo, hard = false) {
+  return RING_BONUS * (hard ? 2 : 1) * Math.max(1, combo);
 }
 
-/** Distance in meters maps 1:1; bonuses add. `ring` is the points earned. */
-export function applyScore(score, { meters = 0, ring = 0, nearMiss = false } = {}) {
+/** The spawn band runs −2…22; past ±6 from its middle (10) a ring reads as
+ * clearly "up top" or "down low" — that's the hard band. */
+export const HARD_RING_BAND = { center: 10, reach: 6 };
+export function isHardRing(y) {
+  return Math.abs(y - HARD_RING_BAND.center) > HARD_RING_BAND.reach;
+}
+
+/** Distance in meters maps 1:1; bonuses add. `ring` is the points earned;
+ * `bonus` is loose extra points (e.g. a boosted thrill), kept out of the
+ * near-miss count so the tally stays honest. */
+export function applyScore(score, { meters = 0, ring = 0, nearMiss = false, bonus = 0 } = {}) {
   score.distance += meters;
   if (ring) { score.rings += 1; score.ringBonus += ring; }
   if (nearMiss) { score.nearMisses += 1; }
-  score.total = Math.floor(score.distance) + score.ringBonus + score.nearMisses * NEAR_MISS_BONUS;
+  if (bonus) { score.bonus += bonus; }
+  score.total = Math.floor(score.distance) + score.ringBonus + score.nearMisses * NEAR_MISS_BONUS + (score.bonus || 0);
   return score;
 }
 

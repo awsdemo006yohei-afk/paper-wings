@@ -11,6 +11,12 @@ body { font: 15px/1.5 system-ui, -apple-system, sans-serif; color: var(--ink); b
 }
 #score { font-size: 42px; font-weight: 800; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.35); }
 
+#boost {
+  margin-top: 2px;
+  font-size: 15px; font-weight: 800; letter-spacing: 1px;
+  color: #ffd60a; text-shadow: 0 1px 6px rgba(0, 0, 0, .45);
+}
+
 #flash {
   position: fixed; top: 30%; left: 50%; transform: translateX(-50%);
   font-weight: 800; font-size: 22px; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.4);

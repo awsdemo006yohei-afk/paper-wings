@@ -1,13 +1,13 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
-import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk } from './logic.js?v=15';
+import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, NEAR_MISS_BONUS } from './logic.js?v=16';
 import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=23';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  hud: $('hud'), score: $('score'), auto: $('autoPilot'),
+  hud: $('hud'), score: $('score'), auto: $('autoPilot'), boost: $('boost'),
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
   best: $('best'), share: $('share'), seeCrash: $('seeCrash'), flyWith: $('flyWith'), overTitle: $('overTitle'),
@@ -145,6 +145,7 @@ function reset() {
   crashMarker.visible = false;
   crashView = false;
   clearTimeout(crashTimer);
+  els.boost.hidden = true;
   state = 'flying';
   els.start.hidden = true;
   els.over.hidden = true;
@@ -153,8 +154,10 @@ function reset() {
 
 function crash() {
   state = 'crashed';
+  score.boostT = 0; // the frame's badge line runs after this — keep it honest
   autoArmT = null; // a crashed plane doesn't need an autopilot appointment
   els.auto.hidden = true; // no autopilot to toggle when you're folded
+  els.boost.hidden = true; // nor a multiplier to chase
   markCrash(plane.position);
   const total = score.total;
   if (total > best) localStorage.setItem(BEST_KEY, String(total));
@@ -220,7 +223,7 @@ window.addEventListener('keydown', (e) => {
     else if (!els.over.hidden) { e.preventDefault(); els.flyWith.click(); }
   }
 });
-window.__pw = { plane, input, state: () => state, auto: () => autoPilot }; // test hook (headless verification)
+window.__pw = { plane, input, state: () => state, auto: () => autoPilot, score: () => score }; // test hook (headless verification)
 
 // hangar: every session opens on the Paper Plane (the title says Paper
 // Wings); after that the score screen offers a random different craft
@@ -333,11 +336,17 @@ function frame(now) {
       (e) => {
         if (e.def.start) { awaitingStart = false; flash('start'); return; } // gate, not a score
         score.combo += 1;
-        const pts = ringPoints(score.combo);
+        let pts = ringPoints(score.combo, isHardRing(e.def.y)); // rings up top / down low pay double
+        if (score.boostT > 0) pts *= 2;
         applyScore(score, { ring: pts });
         flash(score.combo > 1 ? `+${pts} ×${score.combo}` : `+${pts}`);
+        if (score.combo % 4 === 0) { score.boostT = 10; flash('×2 boost — 10s!'); } // every 4th straight ring ignites it
       },
-      () => { applyScore(score, { nearMiss: true }); flash('thrill +10'); },
+      () => {
+        const boosted = score.boostT > 0;
+        applyScore(score, { nearMiss: true, bonus: boosted ? NEAR_MISS_BONUS : 0 }); // thrills pay double mid-boost
+        flash(boosted ? 'thrill +20 ×2' : 'thrill +10');
+      },
       () => crash(),
       () => { // ring slipped past unflown — the combo chain breaks
         if (score.combo > 1) flash('combo lost');
@@ -345,6 +354,8 @@ function frame(now) {
       });
 
     els.score.textContent = String(Math.floor(score.total));
+    if (score.boostT > 0) score.boostT = Math.max(0, score.boostT - dt);
+    els.boost.hidden = !(score.boostT > 0);
 
     // camera chase with lag — the classic framing (a deeper pitch to show the
     // plane's shadow read as a balance change, so it stays retired)
