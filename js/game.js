@@ -394,13 +394,21 @@ export class Input {
     let dragging = false;
     let lastX = 0;
     const DRAG = 100; // px of slide for full left/right
+    // Mouse maps across the 4:3 PLAY strip, not the whole window — widescreen
+    // shows extra scenery the plane can't reach, so the cursor's controllable
+    // range must stop where the plane's does (portrait: the strip IS the width).
+    const playX = (clientX) => {
+      const w = Math.min(window.innerWidth, window.innerHeight * 4 / 3);
+      const x = ((clientX - (window.innerWidth - w) / 2) / w) * 2 - 1;
+      return Math.max(-1, Math.min(1, x));
+    };
     const on = (v) => { this.hold = v; };
     const release = () => { on(false); dragging = false; };
     el.addEventListener('pointerdown', (e) => {
       on(true);
       dragging = e.pointerType === 'touch';
       lastX = e.clientX;
-      if (!dragging) this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
+      if (!dragging) this.steerX = playX(e.clientX);
     });
     el.addEventListener('pointerup', release);
     el.addEventListener('pointercancel', release);
@@ -409,7 +417,7 @@ export class Input {
       if (dragging) {
         this.steerX = Math.max(-1, Math.min(1, this.steerX + (e.clientX - lastX) / DRAG));
         lastX = e.clientX;
-      } else if (e.pointerType !== 'touch') this.steerX = (e.clientX / window.innerWidth) * 2 - 1;
+      } else if (e.pointerType !== 'touch') this.steerX = playX(e.clientX);
     });
     const RISE = ['Space', 'KeyW', 'KeyS', 'ArrowUp', 'ArrowDown'];
     const LEFT = ['KeyA', 'ArrowLeft'];
