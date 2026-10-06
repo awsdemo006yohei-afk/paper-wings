@@ -57,11 +57,6 @@ button {
 button.primary { background: var(--accent); color: #fff; }
 button.primary:hover { filter: brightness(1.05); }
 
-#hangar { display: flex; align-items: center; gap: 12px; justify-content: center; margin-top: 14px; }
-#hangar button { padding: 4px 12px; background: var(--paper); border: 1px solid rgba(42, 36, 64, .2); }
-#hangar button:hover { background: #f1ebdd; }
-#hangar span { min-width: 130px; text-align: center; font-weight: 700; }
-
 @media (max-width: 480px) {
   .panel { padding: 22px 14px; }
   .row { flex-wrap: wrap; }

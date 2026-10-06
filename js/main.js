@@ -11,7 +11,6 @@ const els = {
   start: $('start'), go: $('go'), over: $('over'),
   finalScore: $('finalScore'), finalDetail: $('finalDetail'),
   best: $('best'), share: $('share'), seeCrash: $('seeCrash'), flyWith: $('flyWith'), overTitle: $('overTitle'),
-  craftPrev: $('craftPrev'), craftNext: $('craftNext'), craftName: $('craftName'),
   flash: $('flash'),
 };
 
@@ -139,9 +138,10 @@ function reset() {
   input.clearKeys();
   setAutoPilot(false);
   els.auto.hidden = false;
-  // hands-free takeoff: nothing held down at the start → autopilot cruises
-  // (the countdown on the pill says it's temporary)
-  if (!input.hold && !input.keys.rise && !input.keys.left && !input.keys.right) setAutoPilot(true);
+  // hands-free takeoff: a full second of stillness → autopilot cruises (the
+  // countdown on the pill says it's temporary). Engaging at t=0 felt like the
+  // game grabbing the plane back — it waits for the player to not play first.
+  autoArmT = performance.now();
   crashMarker.visible = false;
   crashView = false;
   clearTimeout(crashTimer);
@@ -153,6 +153,7 @@ function reset() {
 
 function crash() {
   state = 'crashed';
+  autoArmT = null; // a crashed plane doesn't need an autopilot appointment
   els.auto.hidden = true; // no autopilot to toggle when you're folded
   markCrash(plane.position);
   const total = score.total;
@@ -182,6 +183,7 @@ const AUTO_T_MS = 10000;
 let autoTimer = null;
 let autoCount = null;
 let autoSteerMark = 0; // steerX when autopilot engaged — any change past this means hands on
+let autoArmT = null; // takeoff timestamp — a full second of stillness arms the autopilot
 function setAutoPilot(v) {
   autoPilot = v;
   clearTimeout(autoTimer);
@@ -220,23 +222,14 @@ window.addEventListener('keydown', (e) => {
 });
 window.__pw = { plane, input, state: () => state, auto: () => autoPilot }; // test hook (headless verification)
 
-// hangar: pick your craft — curated, family-friendly models only
+// hangar: your craft — picked on the score screen ("Fly with …"); the title
+// keeps just the sky and the button
 const CRAFT_KEY = 'paperWings.craft';
 let craftId = localStorage.getItem(CRAFT_KEY);
 if (!CRAFTS.some((c) => c.id === craftId)) craftId = CRAFTS[0].id;
 function applyCraft() {
-  installCraft(plane, craftId, theme)
-    .then((c) => { els.craftName.textContent = c.name; })
-    .catch(() => {}); // a failed asset load must never take the game down
+  installCraft(plane, craftId, theme).catch(() => {}); // a failed asset load must never take the game down
 }
-function cycleCraft(d) {
-  const i = CRAFTS.findIndex((c) => c.id === craftId);
-  craftId = CRAFTS[(i + d + CRAFTS.length) % CRAFTS.length].id;
-  localStorage.setItem(CRAFT_KEY, craftId);
-  applyCraft();
-}
-els.craftPrev.addEventListener('click', () => cycleCraft(-1));
-els.craftNext.addEventListener('click', () => cycleCraft(1));
 applyCraft();
 
 // score modal: fly with a different craft (restart) · share the card
@@ -288,6 +281,12 @@ function frame(now) {
     // steering away from where the plane sat when autopilot engaged
     if (autoPilot && (holding || input.keys.left || input.keys.right
       || Math.abs(input.steerX - autoSteerMark) > 0.02)) setAutoPilot(false);
+    // hands-free grace: a full second of stillness after takeoff arms it
+    if (autoArmT !== null) {
+      const idle = !input.hold && !input.keys.rise && !input.keys.left && !input.keys.right && input.steerX === 0;
+      if (!idle) autoArmT = null; // touched during the grace — they're flying already
+      else if (performance.now() - autoArmT >= 1000) { autoArmT = null; setAutoPilot(true); }
+    }
     const steerIn = input.steer(dt);
 
     // START gate: until the first ring is cleared the plane flies straight
