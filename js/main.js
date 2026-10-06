@@ -139,6 +139,9 @@ function reset() {
   input.clearKeys();
   setAutoPilot(false);
   els.auto.hidden = false;
+  // hands-free takeoff: nothing held down at the start → autopilot cruises
+  // (the countdown on the pill says it's temporary)
+  if (!input.hold && !input.keys.rise && !input.keys.left && !input.keys.right) setAutoPilot(true);
   crashMarker.visible = false;
   crashView = false;
   clearTimeout(crashTimer);
@@ -178,11 +181,13 @@ const AUTO_HINT = matchMedia('(pointer: coarse)').matches ? '' : ' — z'; // no
 const AUTO_T_MS = 10000;
 let autoTimer = null;
 let autoCount = null;
+let autoSteerMark = 0; // steerX when autopilot engaged — any change past this means hands on
 function setAutoPilot(v) {
   autoPilot = v;
   clearTimeout(autoTimer);
   clearInterval(autoCount);
   if (v) {
+    autoSteerMark = input.steerX;
     let n = 0;
     els.auto.classList.add('on');
     els.auto.textContent = `autopilot on${AUTO_HINT}`;
@@ -279,7 +284,10 @@ function frame(now) {
     // or A/D / ←/→, which drift the held line a little and never recenter.
     // W/S/↑ rise. Any manual control takes over from the autopilot.
     const holding = input.hold || input.keys.rise;
-    if (autoPilot && (holding || input.keys.left || input.keys.right)) setAutoPilot(false);
+    // any manual control takes over — including moving the mouse/touch, i.e.
+    // steering away from where the plane sat when autopilot engaged
+    if (autoPilot && (holding || input.keys.left || input.keys.right
+      || Math.abs(input.steerX - autoSteerMark) > 0.02)) setAutoPilot(false);
     const steerIn = input.steer(dt);
 
     // START gate: until the first ring is cleared the plane flies straight
