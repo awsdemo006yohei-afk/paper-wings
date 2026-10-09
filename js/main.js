@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
-import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=18';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=31';
+import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=19';
+import { World, makePlane, installCraft, CRAFTS, Input, bendWorldY } from './game.js?v=32';
 import { renderCard, shareCard } from './share.js?v=2';
 import { showInterstitial } from './ads.js';
 
@@ -77,9 +77,9 @@ const world = new World(scene, theme);
 // camera sits at the flight-start framing so the panel floats over the
 // same world you're about to fly into.
 plane.visible = false;
-plane.position.set(0, 8, 0);
-camera.position.set(0, 9.2, 11);
-camera.lookAt(0, 6, -14);
+plane.position.set(0, 2, 0);
+camera.position.set(0, 4.2, 11);
+camera.lookAt(0, 0.5, -14);
 const input = new Input(renderer.domElement);
 
 // crash marker: a pulsing ring at the exact collision point — yellow on
@@ -88,6 +88,7 @@ const crashMarker = new THREE.Mesh(
   new THREE.RingGeometry(0.8, 1.15, 32),
   new THREE.MeshBasicMaterial({ color: 0xffd60a, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false }),
 );
+bendWorldY(crashMarker.material);
 crashMarker.renderOrder = 999;
 crashMarker.visible = false;
 scene.add(crashMarker);
@@ -128,9 +129,9 @@ function reset() {
   score = newScore();
   world.reset();
   plane.visible = true;
-  plane.position.set(0, 8, 0);
+  plane.position.set(0, 2, 0);
   plane.rotation.set(0.06, 0, 0);
-  camera.position.set(0, 9.2, 11);
+  camera.position.set(0, 4.2, 11);
   vy = 0; steer = 0;
   awaitingStart = true;
   touchedSinceStart = false;
@@ -254,7 +255,12 @@ const scoreCard = () => {
   card.dataset.total = score.total;
   return card;
 };
-els.share.addEventListener('click', () => shareCard(scoreCard(), `I scored ${Math.floor(score.total)} — beat me?`));
+els.share.addEventListener('click', async () => {
+  if (els.share.disabled) return; // a double-fire made two images — one card per tap
+  els.share.disabled = true;
+  try { await shareCard(scoreCard(), `I scored ${Math.floor(score.total)} — beat me?`); }
+  finally { els.share.disabled = false; }
+});
 els.seeCrash.addEventListener('click', seeCrash);
 renderer.domElement.addEventListener('pointerdown', () => { if (crashView) endCrashView(); }); // tap = done looking
 
@@ -372,7 +378,7 @@ function frame(now) {
     // camera chase with lag — the classic framing (a deeper pitch to show the
     // plane's shadow read as a balance change, so it stays retired)
     camera.position.x += (plane.position.x * 0.55 - camera.position.x) * Math.min(1, dt * 4);
-    camera.position.y += (plane.position.y * 0.4 + 6 - camera.position.y) * Math.min(1, dt * 4);
+    camera.position.y += (plane.position.y * 0.4 + 4.5 - camera.position.y) * Math.min(1, dt * 4);
     camera.position.z = plane.position.z + layout.camDist;
     camera.lookAt(plane.position.x * 0.5, plane.position.y * 0.5 + 2, plane.position.z - 14);
   }

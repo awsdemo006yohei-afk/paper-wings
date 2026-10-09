@@ -158,7 +158,7 @@ export function planStretch(seed, index, difficulty, salt = 0) {
     // welcome ring: dead ahead of the spawn line, ~1 second in — the first
     // thing everyone meets is a clean, centered scoring ring, not traffic.
     // It's the START gate: controls lock until the plane flies through it.
-    items.unshift({ type: 'ring', x: 0, y: 8, z: -20, size: 3.2, spin: 0, start: true });
+    items.unshift({ type: 'ring', x: 0, y: 2, z: -20, size: 3.2, spin: 0, start: true }); // y=2: the drone canyon — hang tips now reach ≈5.6, the gate flies UNDER them
   }
   // rings own their approach: nothing else within ±28 z-units of a ring, so
   // there's always a clean line in and out — players want to thread them
