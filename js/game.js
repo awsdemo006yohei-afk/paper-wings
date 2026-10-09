@@ -128,6 +128,7 @@ export class World {
             if (m.color && !washed.has(m.uuid)) {
               washed.add(m.uuid);
               m.map = null; m.vertexColors = false; // flat paper paint — baked textures would multiply the tint back to dark (#584)
+              if ('metalness' in m) m.metalness = 0; // metallic + no envMap = gray blackout; paper is matte
               const lum = 0.3 * m.color.r + 0.55 * m.color.g + 0.15 * m.color.b;
               m.color.copy(mistC).lerp(whiteC, 0.15 + 0.4 * Math.min(1, lum));
               if (m.emissive) m.emissive.copy(m.color).multiplyScalar(0.15); // hang city lives in shade — keep undersides readable
