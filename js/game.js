@@ -180,7 +180,8 @@ export class World {
           if (b.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
           g.setIndex(b.idx);
           const mesh = new THREE.Mesh(g, b.m); // buffers shared by every row clone
-          mesh.castShadow = true; // the hang city throws its shadows on the cloud floor
+          // buildings cast no shadow — the shadows belong to the plane and
+          // the flying objects (rings, traffic), not the skyline
           city.add(mesh);
           b.pos = b.nor = b.uv = b.idx = null; // staging arrays are huge — let them go now
         }

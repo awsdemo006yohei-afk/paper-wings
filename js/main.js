@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=18';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=30';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=31';
 import { renderCard, shareCard } from './share.js?v=2';
 import { showInterstitial } from './ads.js';
 
@@ -330,9 +330,15 @@ function frame(now) {
     sunLight.position.set(plane.position.x + SUN_OFF.x, plane.position.y + SUN_OFF.y, plane.position.z + SUN_OFF.z);
     sunLight.target.position.copy(plane.position);
 
-    // corridor bounds: only the VISIBLE cloud decks are crashes now (paper
-    // needs sky) — steering can never reach the sides, so no wall deaths
-    if (plane.position.y < -6 || plane.position.y > 29.5) crash();
+    // corridor bounds: the ceiling deck is a crash (paper needs sky, and the
+    // hanging city lives up there) — steering can never reach the sides. But
+    // the white cloud base is SOFT: diving into it never counts as a crash,
+    // it cushions the fall and tosses the plane back into the sky (#568).
+    if (plane.position.y > 29.5) crash();
+    if (plane.position.y < -6) {
+      plane.position.y = -6; // skim the cloud tops instead of sinking through
+      if (vy < 0) vy = 10; // clouds catch you and bounce you back up
+    }
 
     applyScore(score, { meters: speed * dt });
 
