@@ -335,15 +335,11 @@ function frame(now) {
     sunLight.position.set(plane.position.x + SUN_OFF.x, plane.position.y + SUN_OFF.y, plane.position.z + SUN_OFF.z);
     sunLight.target.position.copy(plane.position);
 
-    // corridor bounds: the ceiling deck is a crash (paper needs sky, and the
-    // hanging city lives up there) — steering can never reach the sides. But
-    // the white cloud base is SOFT: diving into it never counts as a crash,
-    // it cushions the fall and tosses the plane back into the sky (#568).
+    // corridor bounds: ceiling, cloud base, and the hanging city are all
+    // solid — touch any of them and the run ends (#580). Steering can never
+    // reach the sides.
     if (plane.position.y > 29.5) crash();
-    if (plane.position.y < -6) {
-      plane.position.y = -6; // ride the cloud tops instead of sinking through
-      if (vy < 0) vy = 0; // clouds cushion the landing — glide, no trampoline (#572)
-    }
+    if (plane.position.y < -6) crash();
 
     applyScore(score, { meters: speed * dt });
 
