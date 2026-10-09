@@ -63,7 +63,7 @@ export class World {
     // sea foam: flecks drifting low across the ocean (#582) — flying through
     // them is the point, and they read as wavecrests on the blue
     const seaMat = new THREE.MeshBasicMaterial({ color: 0xf4f9fd, transparent: true, opacity: 0.78, fog: false }); // foam stays white on blue to the horizon (#594)
-    for (let k = 0; k < 64; k++) {
+    for (let k = 0; k < 24; k++) { // 24, not 64 — the swarm read as too many square clouds (#614)
       const g = new THREE.BoxGeometry(7 + Math.random() * 9, 0.5, 4 + Math.random() * 5);
       const m = new THREE.Mesh(g, seaMat);
       const side = Math.random() < 0.5 ? -1 : 1;
@@ -107,6 +107,11 @@ export class World {
    * clones, so memory is transforms only. Fails soft — piece loads that fail
    * drop out, and with none the paper mountains simply stay. */
   buildCity() {
+    // phones skip the hanging city entirely (#616) — 152 glTF pieces is too
+    // heavy for mobile; the plain flat ceiling deck reads fine without it
+    const mobile = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches)
+      || (typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+    if (mobile) return;
     try {
       const loads = [];
       for (let i = 1; i <= 152; i++) {
@@ -411,7 +416,10 @@ export class World {
     }
     for (const d of this.decks) {
       // leapfrog the deck's own 4-deck chain: shadows land the moment objects show
-      if (d.position.z > plane.z + 65) d.position.z -= d.userData.len * 4;
+      // recycle on the deck's NEAR edge — a center check fired while the deck
+      // still reached 260 ahead of it, opening a ~200-unit no-ocean hole right
+      // under the plane on every leapfrog (#612)
+      if (d.position.z - d.userData.len / 2 > plane.z + 40) d.position.z -= d.userData.len * 4;
     }
     const half = this.citySpan / this.cityUp.length / 2; // one row's depth
     for (const m of this.cityUp) {
