@@ -81,7 +81,7 @@ export class World {
     // sky fog: distance fog is the day's pink, and blue water fading into it
     // read as a weird red far end (#594). Its decks run 520 deep (past the
     // camera's far plane) so an unfogged ocean still never shows an edge.
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0x82b8dc, fog: false }); // calm paper ocean — shadows and the crash line live here
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x929f9e, fog: false }); // calm paper ocean in the user's picked gray-teal (#610) — shadows and the crash line live here
     const ceilMat = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
 
     this.decks = [];

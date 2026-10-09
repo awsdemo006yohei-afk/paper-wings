@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=19';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=40';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=41';
 import { renderCard, shareCard } from './share.js?v=5';
 import { showInterstitial } from './ads.js';
 
