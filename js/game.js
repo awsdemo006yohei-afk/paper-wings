@@ -22,8 +22,11 @@ export class World {
     this.runSalt = 0;           // reshuffled every run — same sky, fresh traffic
     this.ridges = [];
     this.clouds = [];
+    this.city = [];      // Shibuya tiles (async — empty until the glb lands)
+    this.citySpan = 0;   // recycle jump, set when the city builds
 
     this.buildScenery();
+    this.buildCity();
   }
 
   // ------------------------------------------------------------- scenery
@@ -68,7 +71,7 @@ export class World {
     this.decks = [];
     for (const [y, mat] of [[CORRIDOR.bottom, floorMat], [CORRIDOR.top + 4, ceilMat]]) {
       for (let k = 0; k < 4; k++) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(110, 0.6, 130), mat);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(320, 0.6, 130), mat); // 320 wide so the floor reaches under the city walls too
         m.position.set(0, y, -k * 130);
         m.receiveShadow = true;
         this.scene.add(m);
@@ -77,6 +80,44 @@ export class World {
     }
     // home transforms so a fresh run can restore the opening landscape
     this.sceneryHome = [...this.ridges, ...this.clouds, ...this.decks].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
+  }
+
+  /** Shibuya from the Blender pipeline: one flat-shaded block (10k tris, 4
+   * matte bands) scaled into street-canyon walls — towers rise past the flight
+   * line so the run weaves BETWEEN buildings, not over them. The walls sit
+   * just outside the play corridor, so nothing solid is ever scenery-ghosted.
+   * Fails soft — no file, no city, the paper mountains simply stay. */
+  buildCity() {
+    try {
+      new GLTFLoader().load('assets/shibuya_buildings.glb', (gltf) => {
+        const S = 0.2; // 949-wide block → 190-unit tile; towers ~40 over the floor deck, mid-rises at flight level — street, not rooftop cruise
+        const src = gltf.scene;
+        const box = new THREE.Box3().setFromObject(src);
+        const c = box.getCenter(new THREE.Vector3());
+        src.position.set(-c.x, -box.min.y, -c.z); // pivot centered on x/z, base on the floor deck
+        const size = box.getSize(new THREE.Vector3());
+        const tileW = size.x * S, tileD = size.z * S;
+        const ROWS = 3; // 3 × ~153 deep ≈ 459 — past the fog line at 340
+        const wallX = CORRIDOR.halfWidth + 2 + tileW / 2; // tile's inner edge 2 units clear of the steer limit
+        const proto = new THREE.Group();
+        proto.add(src);
+        proto.scale.setScalar(S);
+        for (const cx of [-wallX, wallX]) { // two canyon walls flanking the street the plane flies down
+          for (let r = 0; r < ROWS; r++) {
+            const t = proto.clone();
+            t.rotation.y = (Math.random() - 0.5) * 0.06;
+            t.position.set(cx, CORRIDOR.bottom, -20 - r * tileD + (Math.random() - 0.5) * 6);
+            this.scene.add(t);
+            this.city.push(t);
+          }
+        }
+        this.citySpan = ROWS * tileD;
+        // the city replaces the paper mountains as ground dressing
+        for (const m of this.ridges) this.scene.remove(m);
+        this.ridges = [];
+        this.sceneryHome = [...this.city, ...this.clouds, ...this.decks].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
+      }, undefined, () => {});
+    } catch { /* headless/node has no fetch for the asset — fine, no city */ }
   }
 
   /** Clear the field and generation state for a fresh run. */
@@ -181,6 +222,9 @@ export class World {
     }
     for (const d of this.decks) {
       if (d.position.z > plane.z + 65) d.position.z -= 520; // 4 decks: floor past the 360-unit spawn line, so shadows land the moment objects show
+    }
+    for (const m of this.city) {
+      if (m.position.z > plane.z + 60) m.position.z -= this.citySpan; // the whole grid leapfrogs like the decks
     }
   }
 }

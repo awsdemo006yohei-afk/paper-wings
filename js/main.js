@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=18';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=23';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=25';
 import { renderCard, shareCard } from './share.js';
 import { showInterstitial } from './ads.js';
 
@@ -226,7 +226,7 @@ window.addEventListener('keydown', (e) => {
     else if (!els.over.hidden) { e.preventDefault(); els.flyWith.click(); }
   }
 });
-window.__pw = { plane, input, state: () => state, auto: () => autoPilot, score: () => score }; // test hook (headless verification)
+window.__pw = { plane, input, state: () => state, auto: () => autoPilot, score: () => score, world: () => world, awaiting: () => awaitingStart }; // test hook (headless verification)
 
 // hangar: every session opens on the Paper Plane (the title says Paper
 // Wings); after that the score screen offers a random different craft
