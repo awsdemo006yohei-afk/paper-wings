@@ -55,6 +55,18 @@ export class World {
       this.scene.add(m);
       this.clouds.push(m);
     }
+    // cloud sea: the "ground" reads as an ocean of cloud the city pokes out
+    // of — wisps low across the corridor (flying through them is the point)
+    // and thick under the tower walls
+    const seaMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72 });
+    for (let k = 0; k < 44; k++) {
+      const g = new THREE.BoxGeometry(7 + Math.random() * 9, 0.5, 4 + Math.random() * 5);
+      const m = new THREE.Mesh(g, seaMat);
+      const side = Math.random() < 0.5 ? -1 : 1;
+      m.position.set(side * (8 + Math.random() * 72), -3 + Math.random() * 5, -Math.random() * 400);
+      this.scene.add(m);
+      this.clouds.push(m);
+    }
     // sun
     const sun = new THREE.Mesh(
       new THREE.CircleGeometry(9, 32),
@@ -82,41 +94,46 @@ export class World {
     this.sceneryHome = [...this.ridges, ...this.clouds, ...this.decks].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
   }
 
-  /** Shibuya from the Blender pipeline: one flat-shaded block (10k tris, 4
-   * matte bands) scaled into street-canyon walls — towers rise past the flight
-   * line so the run weaves BETWEEN buildings, not over them. The walls sit
-   * just outside the play corridor, so nothing solid is ever scenery-ghosted.
-   * Fails soft — no file, no city, the paper mountains simply stay. */
+  /** Shibuya from the Blender pipeline: the 24 glb pieces are jigsaw quadrants
+   * of ONE big city — each keeps its native coordinates, so adding them
+   * together reassembles the map (~1836×1415 model units, tallest spire 230).
+   * Scaled so that summit tops out just under the flight line: the run skims
+   * the tower tops above a cloud sea. Geometry is shared across row clones,
+   * so memory is transforms only. Fails soft — piece loads that fail drop
+   * out, and with none the paper mountains simply stay. */
   buildCity() {
     try {
-      new GLTFLoader().load('assets/shibuya_buildings.glb', (gltf) => {
-        const S = 0.2; // 949-wide block → 190-unit tile; towers ~40 over the floor deck, mid-rises at flight level — street, not rooftop cruise
-        const src = gltf.scene;
-        const box = new THREE.Box3().setFromObject(src);
+      const loads = [];
+      for (let i = 1; i <= 24; i++) {
+        loads.push(new Promise((res) => new GLTFLoader().load(`assets/shibuya-${i}.glb`, (g) => res(g.scene), undefined, () => res(null))));
+      }
+      Promise.allSettled(loads).then((rs) => {
+        const pieces = rs.map((r) => r.value).filter(Boolean);
+        if (!pieces.length) return; // no pieces arrived — paper mountains stay
+        const S = 0.06; // big map → 110×85-unit block; tallest tower tops ≈ 8, the flight line skims them
+        const city = new THREE.Group(); // pieces keep their native jigsaw coords
+        for (const p of pieces) city.add(p);
+        city.scale.setScalar(S);
+        const box = new THREE.Box3().setFromObject(city);
         const c = box.getCenter(new THREE.Vector3());
-        src.position.set(-c.x, -box.min.y, -c.z); // pivot centered on x/z, base on the floor deck
-        const size = box.getSize(new THREE.Vector3());
-        const tileW = size.x * S, tileD = size.z * S;
-        const ROWS = 3; // 3 × ~153 deep ≈ 459 — past the fog line at 340
-        const wallX = CORRIDOR.halfWidth + 2 + tileW / 2; // tile's inner edge 2 units clear of the steer limit
+        city.position.set(-c.x, -box.min.y, -c.z); // pivot centered on x/z, base on the floor deck
+        const tileD = box.getSize(new THREE.Vector3()).z; // box is post-scale — S already applied
         const proto = new THREE.Group();
-        proto.add(src);
-        proto.scale.setScalar(S);
-        for (const cx of [-wallX, wallX]) { // two canyon walls flanking the street the plane flies down
-          for (let r = 0; r < ROWS; r++) {
-            const t = proto.clone();
-            t.rotation.y = (Math.random() - 0.5) * 0.06;
-            t.position.set(cx, CORRIDOR.bottom, -20 - r * tileD + (Math.random() - 0.5) * 6);
-            this.scene.add(t);
-            this.city.push(t);
-          }
+        proto.add(city);
+        const ROWS = 5; // 5 × ~85 deep ≈ 425 — past the fog line at 340
+        for (let r = 0; r < ROWS; r++) {
+          const t = proto.clone();
+          t.rotation.y = (Math.random() - 0.5) * 0.03;
+          t.position.set((Math.random() - 0.5) * 4, CORRIDOR.bottom, -20 - r * tileD + (Math.random() - 0.5) * 6);
+          this.scene.add(t);
+          this.city.push(t);
         }
         this.citySpan = ROWS * tileD;
         // the city replaces the paper mountains as ground dressing
         for (const m of this.ridges) this.scene.remove(m);
         this.ridges = [];
         this.sceneryHome = [...this.city, ...this.clouds, ...this.decks].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
-      }, undefined, () => {});
+      });
     } catch { /* headless/node has no fetch for the asset — fine, no city */ }
   }
 
