@@ -21,14 +21,15 @@ export function renderCard({ themeName, palette, score, best, rank, url }) {
   x.beginPath(); x.arc(1040, 500, 46, 0, Math.PI * 2); x.fill();
 
   // paper plane silhouette, dead center of the card, nose vertically up —
-  // the text column stays left of x≈430 so the middle stays clear (#572)
-  x.strokeStyle = '#fff'; x.lineWidth = 7; x.lineJoin = 'round';
-  x.beginPath();
-  x.moveTo(600, 240); x.lineTo(520, 455); x.lineTo(600, 400); x.lineTo(680, 455);
-  x.closePath(); x.stroke();
-  x.beginPath(); // center fold
-  x.moveTo(600, 240); x.lineTo(600, 400);
-  x.stroke();
+  // ink under-stroke keeps the white line readable on pale skies (#576)
+  x.lineJoin = 'round'; x.lineCap = 'round';
+  const dart = () => {
+    x.beginPath();
+    x.moveTo(600, 240); x.lineTo(520, 455); x.lineTo(600, 400); x.lineTo(680, 455);
+    x.closePath(); x.moveTo(600, 240); x.lineTo(600, 400);
+  };
+  x.strokeStyle = palette.ink; x.lineWidth = 13; dart(); x.stroke();
+  x.strokeStyle = '#fff'; x.lineWidth = 7; dart(); x.stroke();
 
   x.fillStyle = '#fff';
   x.font = '600 44px system-ui, sans-serif';

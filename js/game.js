@@ -477,16 +477,31 @@ function tri(mat, a, b, c) {
   return new THREE.Mesh(g, mat);
 }
 
-/** Classic paper dart, nose toward -Z. */
+/** Classic paper dart, nose toward -Z. Cream paper over a charcoal outline
+ *  shell (slightly larger, offset down) — white-on-white vanished in the
+ *  cloud-sea world (#576); the dark rim keeps the dart readable everywhere. */
 function buildPaperPlane(theme) {
   const g = new THREE.Group();
   const { white } = paperMats(theme.palette.accent);
+  const ink = new THREE.MeshBasicMaterial({ color: 0x2f2a33, side: THREE.BackSide });
   const Z = (z, y = 0, x = 0) => new THREE.Vector3(x, y, z);
-  g.add(
-    tri(white, Z(1.15), Z(-1.55), new THREE.Vector3(-1.35, 0.28, 1.05)),  // left wing
-    tri(white, Z(1.15), Z(-1.55), new THREE.Vector3(1.35, 0.28, 1.05)),   // right wing
-    tri(white, Z(1.15), Z(-1.55), Z(1.05, -0.55)),                        // keel
-  );
+  const faces = [
+    [Z(1.15), Z(-1.55), new THREE.Vector3(-1.35, 0.28, 1.05)],  // left wing
+    [Z(1.15), Z(-1.55), new THREE.Vector3(1.35, 0.28, 1.05)],   // right wing
+    [Z(1.15), Z(-1.55), Z(1.05, -0.55)],                        // keel
+  ];
+  for (const [a, b, c] of faces) {
+    g.add(tri(white, a, b, c));
+    const cen = a.clone().add(b).add(c).multiplyScalar(1 / 3);
+    const grow = (v) => v.clone().sub(cen).multiplyScalar(1.18).add(cen);
+    const shell = tri(ink, grow(a), grow(b), grow(c));
+    shell.position.y = -0.05; // dodge coplanar z-fighting; underside reads ink
+    g.add(shell);
+  }
+  const inkLine = new THREE.LineBasicMaterial({ color: 0x2f2a33 });
+  for (const [a, b, c] of faces.slice(0, 2)) { // wing outlines — reads from the chase cam
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b, c, a]), inkLine));
+  }
   return g;
 }
 
