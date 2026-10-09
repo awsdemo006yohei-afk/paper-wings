@@ -24,6 +24,7 @@ export class World {
     this.clouds = [];
     this.city = [];      // Shibuya tiles (async — empty until the glb lands)
     this.citySpan = 0;   // recycle jump, set when the city builds
+    this.cityHeight = null; // building-top height grid — solid city once it lands
 
     this.buildScenery();
     this.buildCity();
@@ -114,10 +115,54 @@ export class World {
         const city = new THREE.Group(); // pieces keep their native jigsaw coords
         for (const p of pieces) city.add(p);
         city.scale.setScalar(S);
+        // raw Blender palette runs neon — wash every material toward warm
+        // paper so the city sits in the sky's soft world (variety stays, candy goes)
+        const paper = new THREE.Color(0xf3ede2);
+        const washed = new Set();
+        city.traverse((o) => {
+          if (!o.isMesh) return;
+          for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+            if (m.color && !washed.has(m.uuid)) {
+              washed.add(m.uuid);
+              m.color.lerp(paper, 0.68);
+              if ('roughness' in m) m.roughness = Math.max(m.roughness, 0.85);
+            }
+          }
+        });
         const box = new THREE.Box3().setFromObject(city);
         const c = box.getCenter(new THREE.Vector3());
         city.position.set(-c.x, -box.min.y, -c.z); // pivot centered on x/z, base on the floor deck
         const tileD = box.getSize(new THREE.Vector3()).z; // box is post-scale — S already applied
+        // solid city: rasterize every triangle's footprint into a height grid
+        // (one lookup per frame kills the whole "touch a building = crash" rule)
+        const CELL = 0.5;
+        this.hMinX = box.min.x; this.hMinZ = box.min.z;
+        this.hnx = Math.ceil((box.max.x - box.min.x) / CELL); this.hnz = Math.ceil((box.max.z - box.min.z) / CELL);
+        this.cityHeight = new Float32Array(this.hnx * this.hnz);
+        city.updateMatrixWorld(true);
+        const v = new THREE.Vector3();
+        city.traverse((o) => {
+          if (!o.isMesh || !o.geometry?.attributes?.position) return;
+          const pos = o.geometry.attributes.position, idx = o.geometry.index;
+          const tris = Math.floor((idx ? idx.count : pos.count) / 3);
+          const t = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+          for (let k = 0; k < tris; k++) {
+            for (let j = 0; j < 3; j++) {
+              const vi = idx ? idx.getX(k * 3 + j) : k * 3 + j;
+              t[j].fromBufferAttribute(pos, vi).applyMatrix4(o.matrixWorld);
+            }
+            const x0 = Math.max(0, Math.floor((Math.min(t[0].x, t[1].x, t[2].x) - this.hMinX) / CELL));
+            const x1 = Math.min(this.hnx - 1, Math.ceil((Math.max(t[0].x, t[1].x, t[2].x) - this.hMinX) / CELL));
+            const z0 = Math.max(0, Math.floor((Math.min(t[0].z, t[1].z, t[2].z) - this.hMinZ) / CELL));
+            const z1 = Math.min(this.hnz - 1, Math.ceil((Math.max(t[0].z, t[1].z, t[2].z) - this.hMinZ) / CELL));
+            const top = Math.max(t[0].y, t[1].y, t[2].y);
+            for (let jz = z0; jz <= z1; jz++) for (let jx = x0; jx <= x1; jx++) {
+              const at = jz * this.hnx + jx;
+              if (top > this.cityHeight[at]) this.cityHeight[at] = top;
+            }
+          }
+        });
+        this.cityOff = { x: city.position.x, z: city.position.z }; // proto-local → map coords
         const proto = new THREE.Group();
         proto.add(city);
         const ROWS = 5; // 5 × ~85 deep ≈ 425 — past the fog line at 340
@@ -135,6 +180,33 @@ export class World {
         this.sceneryHome = [...this.city, ...this.clouds, ...this.decks].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
       });
     } catch { /* headless/node has no fetch for the asset — fine, no city */ }
+  }
+
+  /** Is (x, y, z) inside a building? One grid lookup against the row the
+   * point sits in — roofs pay 0.35 of forgiveness so grazes read as grazes. */
+  cityHit(x, y, z) {
+    if (!this.cityHeight) return false;
+    for (const r of this.city) {
+      const dz = z - r.position.z;
+      if (Math.abs(dz) > this.citySpan / this.city.length / 2) continue;
+      const c = Math.cos(r.rotation.y), s = Math.sin(r.rotation.y);
+      const lx = (x - r.position.x) * c - dz * s;   // undo the row's tiny yaw
+      const lz = (x - r.position.x) * s + dz * c;
+      const u = lx - this.cityOff.x, w = lz - this.cityOff.z; // proto → map coords
+      const jx = Math.floor((u - this.hMinX) / 0.5), jz = Math.floor((w - this.hMinZ) / 0.5);
+      if (jx < 0 || jz < 0 || jx >= this.hnx || jz >= this.hnz) return false;
+      return y < this.cityHeight[jz * this.hnx + jx] - 0.35;
+    }
+    return false;
+  }
+
+  /** Test helper: a mapped spot with roofs at least minH tall (city space). */
+  citySpot(minH) {
+    if (!this.cityHeight) return null;
+    for (let jz = 0; jz < this.hnz; jz += 4) for (let jx = 0; jx < this.hnx; jx += 4) {
+      if (this.cityHeight[jz * this.hnx + jx] >= minH) return { x: this.hMinX + jx * 0.5, z: this.hMinZ + jz * 0.5 };
+    }
+    return null;
   }
 
   /** Clear the field and generation state for a fresh run. */
@@ -243,6 +315,8 @@ export class World {
     for (const m of this.city) {
       if (m.position.z > plane.z + 60) m.position.z -= this.citySpan; // the whole grid leapfrogs like the decks
     }
+    // buildings are solid: dive into the city and a roof ends the run
+    if (this.cityHit(plane.x, plane.y, plane.z)) onHit({ def: { type: 'city' } });
   }
 }
 
