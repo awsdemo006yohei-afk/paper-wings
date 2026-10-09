@@ -1,8 +1,8 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=19';
-import { World, makePlane, installCraft, CRAFTS, Input, bendWorldY } from './game.js?v=32';
-import { renderCard, shareCard } from './share.js?v=2';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=33';
+import { renderCard, shareCard } from './share.js?v=3';
 import { showInterstitial } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
@@ -88,7 +88,6 @@ const crashMarker = new THREE.Mesh(
   new THREE.RingGeometry(0.8, 1.15, 32),
   new THREE.MeshBasicMaterial({ color: 0xffd60a, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false }),
 );
-bendWorldY(crashMarker.material);
 crashMarker.renderOrder = 999;
 crashMarker.visible = false;
 scene.add(crashMarker);
@@ -342,8 +341,8 @@ function frame(now) {
     // it cushions the fall and tosses the plane back into the sky (#568).
     if (plane.position.y > 29.5) crash();
     if (plane.position.y < -6) {
-      plane.position.y = -6; // skim the cloud tops instead of sinking through
-      if (vy < 0) vy = 10; // clouds catch you and bounce you back up
+      plane.position.y = -6; // ride the cloud tops instead of sinking through
+      if (vy < 0) vy = 0; // clouds cushion the landing — glide, no trampoline (#572)
     }
 
     applyScore(score, { meters: speed * dt });

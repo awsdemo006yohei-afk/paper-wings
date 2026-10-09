@@ -130,7 +130,7 @@ await test('the run salt reshuffles traffic; stretch 0 opens with a welcome ring
   const ring = open[0];
   assert.equal(ring.type, 'ring');
   assert.equal(ring.x, 0);
-  assert.equal(ring.y, 8);
+  assert.equal(ring.y, 2); // the drone canyon: the gate flies under the hang tips
   assert.equal(ring.z, -20, 'first ring ~1s ahead of the spawn line');
   assert.equal(ring.start, true, 'first ring is the START gate that unlocks controls');
 });

@@ -11,25 +11,6 @@ const KEY_DRIFT_MAX = 1.0;   // speed after KEY_DRIFT_T of continuous holding �
 const KEY_DRIFT_T = 1.5;     // seconds of holding to reach full speed
 const CELL = 1;              // city height-grid cell, world units — 0.5 doubled the grid into OOM territory
 
-// ---- tube world (#570): the corridor is the inside of a huge cylinder lying
-// along the flight line. The sky edges droop away at the sides and the cloud
-// sea fills the bottom half of the tube. The bend is a pure function of world
-// x, applied only in the vertex shader — physics and collisions stay square.
-export const BEND_R = 70;
-const bentMats = new WeakSet();
-export function bendWorldY(mat) {
-  if (!mat || bentMats.has(mat)) return;
-  bentMats.add(mat);
-  mat.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `
-      vec4 bw = modelMatrix * vec4(transformed, 1.0);
-      bw.y -= ${BEND_R}.0 - sqrt(max(0.0, ${BEND_R}.0 * ${BEND_R}.0 - bw.x * bw.x));
-      vec4 mvPosition = viewMatrix * bw; // keeps the fog depth chunk honest
-      gl_Position = projectionMatrix * mvPosition;`);
-  };
-  mat.customProgramCacheKey = () => 'bent'; // one shared bent program per material class
-}
-
 export class World {
   constructor(scene, theme) {
     this.scene = scene;
@@ -60,7 +41,6 @@ export class World {
     // paper mountains: recycled ridge lines on both sides
     const ridgeMat = new THREE.MeshStandardMaterial({ color: 0xf5f0e6, roughness: 0.9, metalness: 0, flatShading: true });
     this.ridges = [];
-    bendWorldY(ridgeMat);
     for (let side = -1; side <= 1; side += 2) {
       for (let k = 0; k < 6; k++) {
         const g = new THREE.ConeGeometry(10 + Math.random() * 8, 16 + Math.random() * 14, 4);
@@ -73,7 +53,6 @@ export class World {
     }
     // flat paper clouds drifting high
     const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
-    bendWorldY(cloudMat);
     for (let k = 0; k < 10; k++) {
       const g = new THREE.BoxGeometry(6 + Math.random() * 8, 0.4, 3 + Math.random() * 3);
       const m = new THREE.Mesh(g, cloudMat);
@@ -85,7 +64,6 @@ export class World {
     // of — wisps low across the corridor (flying through them is the point)
     // and thick under the tower walls
     const seaMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72 });
-    bendWorldY(seaMat);
     for (let k = 0; k < 64; k++) {
       const g = new THREE.BoxGeometry(7 + Math.random() * 9, 0.5, 4 + Math.random() * 5);
       const m = new THREE.Mesh(g, seaMat);
@@ -110,7 +88,7 @@ export class World {
     // both decks take the sun's shadows (MeshBasic can't receive them).
     const floorMat = new THREE.MeshLambertMaterial({ color: 0xf1f4f8 }); // white cloud base — the hang city's shadows land here
     const ceilMat = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
-    bendWorldY(floorMat); bendWorldY(ceilMat);
+
     this.decks = [];
     for (const [y, mat] of [[CORRIDOR.bottom, floorMat], [CORRIDOR.top + 4, ceilMat]]) {
       for (let k = 0; k < 4; k++) {
@@ -203,7 +181,6 @@ export class World {
           if (b.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
           g.setIndex(b.idx);
           const mesh = new THREE.Mesh(g, b.m); // buffers shared by every row clone
-          bendWorldY(b.m);
           // buildings cast no shadow — the shadows belong to the plane and
           // the flying objects (rings, traffic), not the skyline
           city.add(mesh);
@@ -383,12 +360,10 @@ export class World {
         new THREE.TorusGeometry(3.2, 0.35, 8, 24),
         new THREE.MeshStandardMaterial({ color: this.theme.palette.accent, roughness: 0.5, metalness: 0.1 }),
       );
-      bendWorldY(ring.material);
       ring.castShadow = true;
       return ring;
     }
     const mat = new THREE.MeshStandardMaterial({ color: type === 'blade' ? 0x8b93a6 : 0xfff8ef, roughness: 0.85, flatShading: true });
-    bendWorldY(mat);
     const g = type === 'blade'
       ? new THREE.BoxGeometry(7, 0.5, 0.5)
       : new THREE.BoxGeometry(1, 1, 1);
@@ -453,7 +428,6 @@ export class World {
 export function makePlane() {
   const g = new THREE.Group();
   const flame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.65, 8), new THREE.MeshBasicMaterial({ color: 0xffc46b }));
-  bendWorldY(flame.material);
   flame.rotation.x = Math.PI / 2; // apex toward +Z (trailing)
   flame.position.z = 1.6;
   g.userData.flame = flame;
@@ -631,7 +605,7 @@ export async function installCraft(plane, id, theme) {
     model = (await loadRocketScene()).clone(true);
   }
   if (plane.userData.craft) plane.remove(plane.userData.craft); // swap in place
-  model.traverse((o) => { if (o.isMesh) { o.castShadow = true; bendWorldY(o.material); } }); // every craft drops a shadow and bends with the tube
+  model.traverse((o) => { if (o.isMesh) o.castShadow = true; }); // every craft drops a shadow
   plane.add(model);
   plane.userData.craft = model;
   plane.userData.hitR = craft.hitR ?? 1.1; // sharpness matters: the collision radius rides on the craft
