@@ -62,7 +62,7 @@ export class World {
     }
     // sea foam: flecks drifting low across the ocean (#582) — flying through
     // them is the point, and they read as wavecrests on the blue
-    const seaMat = new THREE.MeshBasicMaterial({ color: 0xf4f9fd, transparent: true, opacity: 0.78 });
+    const seaMat = new THREE.MeshBasicMaterial({ color: 0xf4f9fd, transparent: true, opacity: 0.78, fog: false }); // foam stays white on blue to the horizon (#594)
     for (let k = 0; k < 64; k++) {
       const g = new THREE.BoxGeometry(7 + Math.random() * 9, 0.5, 4 + Math.random() * 5);
       const m = new THREE.Mesh(g, seaMat);
@@ -77,16 +77,20 @@ export class World {
     // (no sun disc — the sky reads cleaner without it, #586)
     // paper decks: the floor is now a paper OCEAN (#582) — crashing into
     // water reads true — and the ceiling keeps the cloud look. Both take the
-    // sun's shadows (MeshBasic can't receive them).
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0x82b8dc }); // calm paper ocean — shadows and the crash line live here
+    // sun's shadows (MeshBasic can't receive them). The ocean opts OUT of the
+    // sky fog: distance fog is the day's pink, and blue water fading into it
+    // read as a weird red far end (#594). Its decks run 520 deep (past the
+    // camera's far plane) so an unfogged ocean still never shows an edge.
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x82b8dc, fog: false }); // calm paper ocean — shadows and the crash line live here
     const ceilMat = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
 
     this.decks = [];
-    for (const [y, mat] of [[CORRIDOR.bottom, floorMat], [CORRIDOR.top + 4, ceilMat]]) {
+    for (const [y, mat, len] of [[CORRIDOR.bottom, floorMat, 520], [CORRIDOR.top + 4, ceilMat, 130]]) {
       for (let k = 0; k < 4; k++) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(320, 0.6, 130), mat); // 320 wide so the floor reaches under the city walls too
-        m.position.set(0, y, -k * 130);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(320, 0.6, len), mat); // 320 wide so the floor reaches under the city walls too
+        m.position.set(0, y, -k * len);
         m.receiveShadow = true;
+        m.userData.len = len; // recycle leapfrogs the deck's own chain length
         this.scene.add(m);
         this.decks.push(m);
       }
@@ -406,7 +410,8 @@ export class World {
       if (c.position.z > plane.z + 40) c.position.z -= 400;
     }
     for (const d of this.decks) {
-      if (d.position.z > plane.z + 65) d.position.z -= 520; // 4 decks: floor past the 360-unit spawn line, so shadows land the moment objects show
+      // leapfrog the deck's own 4-deck chain: shadows land the moment objects show
+      if (d.position.z > plane.z + 65) d.position.z -= d.userData.len * 4;
     }
     const half = this.citySpan / this.cityUp.length / 2; // one row's depth
     for (const m of this.cityUp) {
