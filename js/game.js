@@ -60,10 +60,9 @@ export class World {
       this.scene.add(m);
       this.clouds.push(m);
     }
-    // cloud sea: the "ground" reads as an ocean of cloud the city pokes out
-    // of — wisps low across the corridor (flying through them is the point)
-    // and thick under the tower walls
-    const seaMat = new THREE.MeshBasicMaterial({ color: 0xdfe9f2, transparent: true, opacity: 0.72 }); // soft blue-paper — pure white blew out the floor (#578)
+    // sea foam: flecks drifting low across the ocean (#582) — flying through
+    // them is the point, and they read as wavecrests on the blue
+    const seaMat = new THREE.MeshBasicMaterial({ color: 0xf4f9fd, transparent: true, opacity: 0.78 });
     for (let k = 0; k < 64; k++) {
       const g = new THREE.BoxGeometry(7 + Math.random() * 9, 0.5, 4 + Math.random() * 5);
       const m = new THREE.Mesh(g, seaMat);
@@ -82,11 +81,10 @@ export class World {
     );
     sun.position.set(-30, 34, -420);
     this.scene.add(sun);
-    // paper cloud decks: the floor and ceiling of the corridor, made VISIBLE —
-    // the old invisible bounds crashed planes in empty air ("hit nothing").
-    // The floor is a dusk-blue gray so the white crafts read against it, and
-    // both decks take the sun's shadows (MeshBasic can't receive them).
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0xdce6ef }); // soft blue-paper cloud base — the hang city's shadows land here (#578)
+    // paper decks: the floor is now a paper OCEAN (#582) — crashing into
+    // water reads true — and the ceiling keeps the cloud look. Both take the
+    // sun's shadows (MeshBasic can't receive them).
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x82b8dc }); // calm paper ocean — shadows and the crash line live here
     const ceilMat = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
 
     this.decks = [];
