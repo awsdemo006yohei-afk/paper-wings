@@ -1,8 +1,8 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=18';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=29';
-import { renderCard, shareCard } from './share.js';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=30';
+import { renderCard, shareCard } from './share.js?v=2';
 import { showInterstitial } from './ads.js';
 
 const $ = (id) => document.getElementById(id);
@@ -309,6 +309,7 @@ function frame(now) {
         // Once that run is over, hands-off means hands-off: the plane falls like any released plane.
       } else {
         vy += (holding ? 26 : -22) * dt;
+        if (input.doubleTap) { vy = 14; input.doubleTap = false; } // double-click/tap: a kick to double height
         vy = Math.max(-18, Math.min(14, vy));
       }
     }

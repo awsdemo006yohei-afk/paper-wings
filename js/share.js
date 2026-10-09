@@ -20,10 +20,10 @@ export function renderCard({ themeName, palette, score, best, rank, url }) {
   x.fillStyle = palette.sun;
   x.beginPath(); x.arc(1040, 500, 46, 0, Math.PI * 2); x.fill();
 
-  // little paper plane silhouette
+  // paper plane silhouette, middle-right — the text column owns the left
   x.strokeStyle = '#fff'; x.lineWidth = 7; x.lineJoin = 'round';
   x.beginPath();
-  x.moveTo(120, 470); x.lineTo(210, 430); x.lineTo(160, 455); x.lineTo(190, 505);
+  x.moveTo(770, 520); x.lineTo(950, 430); x.lineTo(855, 470); x.lineTo(900, 560);
   x.closePath(); x.stroke();
 
   x.fillStyle = '#fff';

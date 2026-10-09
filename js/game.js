@@ -9,6 +9,7 @@ const STRETCH_AHEAD = 3;   // keep N stretches generated ahead of the plane
 const KEY_DRIFT = 0.25;      // keyboard steer speed at first press: steerX units/s — a nudge, not a dodge
 const KEY_DRIFT_MAX = 1.0;   // speed after KEY_DRIFT_T of continuous holding — keep pushing to really travel
 const KEY_DRIFT_T = 1.5;     // seconds of holding to reach full speed
+const CELL = 1;              // city height-grid cell, world units — 0.5 doubled the grid into OOM territory
 
 export class World {
   constructor(scene, theme) {
@@ -22,11 +23,11 @@ export class World {
     this.runSalt = 0;           // reshuffled every run — same sky, fresh traffic
     this.ridges = [];
     this.clouds = [];
-    this.city = [];      // Shibuya tiles (async — empty until the glb lands)
-    this.cityUp = [];    // the Inception half: the same city, hanging from the ceiling
+    this.city = [];      // floor rows are gone — the ground reads as open cloud sea
+    this.cityUp = [];    // Shibuya itself, hanging inverted from the ceiling
     this.citySpan = 0;   // recycle jump, set when the city builds
-    this.cityHeight = null; // building-top height grid — solid city once it lands
-    this.cityCeil = null;   // hang-tip grid (min Y per cell) — the ceiling city is solid too
+    this.cityHeight = null; // (floor city retired — hang tips are the only city collision)
+    this.cityCeil = null;   // hang-tip grid (min Y per cell) — the hanging city is solid
     this.cityTop = CORRIDOR.top; // traffic caps here once the hang city lands (canyon bound)
 
     this.buildScenery();
@@ -63,11 +64,14 @@ export class World {
     // of — wisps low across the corridor (flying through them is the point)
     // and thick under the tower walls
     const seaMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72 });
-    for (let k = 0; k < 44; k++) {
+    for (let k = 0; k < 64; k++) {
       const g = new THREE.BoxGeometry(7 + Math.random() * 9, 0.5, 4 + Math.random() * 5);
       const m = new THREE.Mesh(g, seaMat);
       const side = Math.random() < 0.5 ? -1 : 1;
-      m.position.set(side * (8 + Math.random() * 72), -3 + Math.random() * 5, -Math.random() * 400);
+      // half the wisps line the walls, half drift low across the open floor —
+      // with the ground city gone, this flow IS the ground
+      const x = k % 2 ? side * (8 + Math.random() * 72) : (Math.random() * 2 - 1) * 26;
+      m.position.set(x, -3 + Math.random() * 5, -Math.random() * 400);
       this.scene.add(m);
       this.clouds.push(m);
     }
@@ -82,7 +86,7 @@ export class World {
     // the old invisible bounds crashed planes in empty air ("hit nothing").
     // The floor is a dusk-blue gray so the white crafts read against it, and
     // both decks take the sun's shadows (MeshBasic can't receive them).
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0x8fa3b8 });
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0xf1f4f8 }); // white cloud base — the hang city's shadows land here
     const ceilMat = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
     this.decks = [];
     for (const [y, mat] of [[CORRIDOR.bottom, floorMat], [CORRIDOR.top + 4, ceilMat]]) {
@@ -98,13 +102,13 @@ export class World {
     this.sceneryHome = [...this.ridges, ...this.clouds, ...this.decks].map((m) => ({ m, p: m.position.clone(), r: m.rotation.clone() }));
   }
 
-  /** Shibuya from the Blender pipeline: the 24 glb pieces are jigsaw quadrants
+  /** Shibuya from the Blender pipeline: the 152 glb pieces are jigsaw tiles
    * of ONE big city — each keeps its native coordinates, so adding them
    * together reassembles the map (~1836×1415 model units, tallest spire 230).
-   * Scaled so that summit tops out just under the flight line: the run skims
-   * the tower tops above a cloud sea. Geometry is shared across row clones,
-   * so memory is transforms only. Fails soft — piece loads that fail drop
-   * out, and with none the paper mountains simply stay. */
+   * Only the INVERTED mirror flies here: the city hangs from the ceiling deck
+   * over an open cloud sea, drone-view big. Geometry is shared across row
+   * clones, so memory is transforms only. Fails soft — piece loads that fail
+   * drop out, and with none the paper mountains simply stay. */
   buildCity() {
     try {
       const loads = [];
@@ -114,7 +118,7 @@ export class World {
       Promise.allSettled(loads).then((rs) => {
         const pieces = rs.map((r) => r.value).filter(Boolean);
         if (!pieces.length) return; // no pieces arrived — paper mountains stay
-        const S = 0.06; // big map → 110×85-unit block; tallest tower tops ≈ 8, the flight line skims them
+        const S = 0.06; // big map → 110×85-unit block; sets the mirror's footprint and hang depth
         const city = new THREE.Group(); // pieces keep their native jigsaw coords
         for (const p of pieces) city.add(p);
         city.scale.setScalar(S);
@@ -175,43 +179,40 @@ export class World {
           if (b.nor) g.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
           if (b.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
           g.setIndex(b.idx);
-          city.add(new THREE.Mesh(g, b.m)); // buffers shared by every row clone + the hang mirror
+          const mesh = new THREE.Mesh(g, b.m); // buffers shared by every row clone
+          mesh.castShadow = true; // the hang city throws its shadows on the cloud floor
+          city.add(mesh);
+          b.pos = b.nor = b.uv = b.idx = null; // staging arrays are huge — let them go now
         }
         const c = box.getCenter(new THREE.Vector3());
         city.position.set(-c.x, -box.min.y, -c.z); // pivot centered on x/z, base on the floor deck
         const tileD = box.getSize(new THREE.Vector3()).z; // box is post-scale — S already applied
-        // solid city: rasterize every triangle's footprint into a height grid
-        // (one lookup per frame kills the whole "touch a building = crash" rule)
-        const CELL = 0.5;
-        this.hMinX = box.min.x; this.hMinZ = box.min.z;
-        this.hnx = Math.ceil((box.max.x - box.min.x) / CELL); this.hnz = Math.ceil((box.max.z - box.min.z) / CELL);
-        this.cityHeight = new Float32Array(this.hnx * this.hnz);
-        // the Inception half: the same city flipped upside down, hanging from
-        // the ceiling deck. Its deepest tips shape the canyon the plane flies.
+        // solid city: rasterize every triangle's footprint into a tip grid
+        // (one lookup per frame kills the whole "touch a building = crash" rule).
+        // The floor city is gone — the ground is cloud sea — so the grid maps
+        // the HANGING mirror only: its tips are the whole collision surface.
         const HANG_Y = CORRIDOR.top + 4 - 0.3; // ceiling deck underside
+        const HANG_SCALE = 1.4; // drone view, not satellite: towers loom, tips reach two-thirds down the corridor
         const hang = city.clone();
+        hang.scale.multiplyScalar(HANG_SCALE); // multiply — setScalar would wipe the base S shrink
         hang.rotation.z = Math.PI;
         hang.position.set(city.position.x, HANG_Y, city.position.z); // the group carries its height (raster reads world y); rows sit at y=0
+        hang.updateMatrixWorld(true);
+        const hbox = new THREE.Box3().setFromObject(hang); // world footprint of the SCALED mirror
+        this.hMinX = hbox.min.x - hang.position.x; this.hMinZ = hbox.min.z - hang.position.z; // grid space = hang-local
+        this.hnx = Math.ceil((hbox.max.x - hbox.min.x) / CELL); this.hnz = Math.ceil((hbox.max.z - hbox.min.z) / CELL);
         this.cityCeil = new Float32Array(this.hnx * this.hnz).fill(Infinity);
-        this.rasterizeCity(city, city.position, this.cityHeight, null);
         this.rasterizeCity(hang, hang.position, null, this.cityCeil);
-        this.cityTop = HANG_Y - (box.max.y - box.min.y) - 1.5; // just under the deepest hang tip — traffic stays out of the towers
+        this.cityTop = HANG_Y - (box.max.y - box.min.y) * HANG_SCALE - 1.5; // just under the deepest hang tip — traffic stays out of the towers
         this.hangY = HANG_Y; // exposed for the test helper (hang depth = hangY − tip)
-        this.cityOff = { x: city.position.x, z: city.position.z }; // proto-local → map coords
-        const proto = new THREE.Group();
-        proto.add(city);
+        this.cityOff = { x: hang.position.x, z: hang.position.z }; // hang-local → row coords
         const protoUp = new THREE.Group();
         protoUp.add(hang);
         const ROWS = 2; // 2 × ~445 deep ≈ 890 — double the fog line at 340; clones share geometry so rows are transforms only
         for (let r = 0; r < ROWS; r++) {
           const yaw = (Math.random() - 0.5) * 0.03, xj = (Math.random() - 0.5) * 4;
           const z = -20 - r * tileD + (Math.random() - 0.5) * 6;
-          const t = proto.clone(); // the street below…
-          t.rotation.y = yaw;
-          t.position.set(xj, CORRIDOR.bottom, z);
-          this.scene.add(t);
-          this.city.push(t);
-          const u = protoUp.clone(); // …and its mirror hanging overhead, same column
+          const u = protoUp.clone(); // the city overhead, solid down to its deepest tip
           u.rotation.y = yaw;
           u.position.set(xj, 0, z); // height lives inside the proto (HANG_Y) — don't add it twice
           this.scene.add(u);
@@ -245,18 +246,18 @@ export class World {
           t[j].fromBufferAttribute(pos, vi).applyMatrix4(o.matrixWorld);
           t[j].x -= off.x; t[j].z -= off.z;
         }
-        const x0 = Math.max(0, Math.floor((Math.min(t[0].x, t[1].x, t[2].x) - this.hMinX) / 0.5));
-        const x1 = Math.min(this.hnx - 1, Math.ceil((Math.max(t[0].x, t[1].x, t[2].x) - this.hMinX) / 0.5));
-        const z0 = Math.max(0, Math.floor((Math.min(t[0].z, t[1].z, t[2].z) - this.hMinZ) / 0.5));
-        const z1 = Math.min(this.hnz - 1, Math.ceil((Math.max(t[0].z, t[1].z, t[2].z) - this.hMinZ) / 0.5));
+        const x0 = Math.max(0, Math.floor((Math.min(t[0].x, t[1].x, t[2].x) - this.hMinX) / CELL));
+        const x1 = Math.min(this.hnx - 1, Math.ceil((Math.max(t[0].x, t[1].x, t[2].x) - this.hMinX) / CELL));
+        const z0 = Math.max(0, Math.floor((Math.min(t[0].z, t[1].z, t[2].z) - this.hMinZ) / CELL));
+        const z1 = Math.min(this.hnz - 1, Math.ceil((Math.max(t[0].z, t[1].z, t[2].z) - this.hMinZ) / CELL));
         const hi = Math.max(t[0].y, t[1].y, t[2].y), lo = Math.min(t[0].y, t[1].y, t[2].y);
         const ax = t[2].x - t[0].x, az = t[2].z - t[0].z;
         const bx = t[1].x - t[0].x, bz = t[1].z - t[0].z;
         const den = ax * bz - az * bx;
         if (den === 0) continue; // edge-on wall line — the roof on top covers its footprint
         for (let jz = z0; jz <= z1; jz++) for (let jx = x0; jx <= x1; jx++) {
-          const px = this.hMinX + (jx + 0.5) * 0.5 - t[0].x;
-          const pz = this.hMinZ + (jz + 0.5) * 0.5 - t[0].z;
+          const px = this.hMinX + (jx + 0.5) * CELL - t[0].x;
+          const pz = this.hMinZ + (jz + 0.5) * CELL - t[0].z;
           const u = (px * bz - pz * bx) / den;
           const v = (pz * ax - px * az) / den;
           if (u < 0 || v < 0 || u + v > 1) continue;
@@ -268,52 +269,27 @@ export class World {
     });
   }
 
-  /** Is (x, y, z) inside a building — floor roof below or hang tip above?
-   * One grid lookup against the row the point sits in (floor and hang rows
-   * share columns, so one pass covers both); 0.35 of forgiveness so grazes
-   * read as grazes. */
+  /** Is (x, y, z) inside a hanging building? One grid lookup against the row
+   * the point sits in; 0.35 of forgiveness so grazes read as grazes. */
   cityHit(x, y, z) {
-    if (!this.cityHeight) return false;
-    for (const r of this.city) {
+    if (!this.cityCeil) return false;
+    for (const r of this.cityUp) {
       const dz = z - r.position.z;
-      if (Math.abs(dz) > this.citySpan / this.city.length / 2) continue;
+      if (Math.abs(dz) > this.citySpan / this.cityUp.length / 2) continue;
       const c = Math.cos(r.rotation.y), s = Math.sin(r.rotation.y);
       const lx = (x - r.position.x) * c - dz * s;   // undo the row's tiny yaw
       const lz = (x - r.position.x) * s + dz * c;
-      const u = lx - this.cityOff.x, w = lz - this.cityOff.z; // proto → map coords
-      const jx = Math.floor((u - this.hMinX) / 0.5), jz = Math.floor((w - this.hMinZ) / 0.5);
+      const u = lx - this.cityOff.x, w = lz - this.cityOff.z; // → hang-local map coords
+      const jx = Math.floor((u - this.hMinX) / CELL), jz = Math.floor((w - this.hMinZ) / CELL);
       if (jx < 0 || jz < 0 || jx >= this.hnx || jz >= this.hnz) return false;
-      const at = jz * this.hnx + jx;
-      // the roof grid is proto-space (base at 0); rows sit on the floor deck,
-      // so world roof = grid + CORRIDOR.bottom. Hang tips are already world.
-      if (y < this.cityHeight[at] + CORRIDOR.bottom - 0.35) return true; // a roof below
-      return y > this.cityCeil[at] + 0.35;                               // a hang tip above (Infinity = open sky)
+      return y > this.cityCeil[jz * this.hnx + jx] + 0.35; // a hang tip above (Infinity = open sky)
     }
     return false;
   }
 
-  /** Test helper: a mapped spot with a solid roof core — the cell and its
-   * 3×3 neighborhood all reach minH, so a teleport lands on the roof even
-   * after the row's sub-degree yaw nudges the lookup a cell sideways. */
-  citySpot(minH) {
-    if (!this.cityHeight) return null;
-    const core = (grid, at, jx, jz, ok) => {
-      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
-        const j = (jz + dz) * this.hnx + (jx + dx);
-        if (jz + dz < 0 || jz + dz >= this.hnz || jx + dx < 0 || jx + dx >= this.hnx || !(grid[j] >= ok)) return false;
-      }
-      return true;
-    };
-    for (let jz = 2; jz < this.hnz - 2; jz += 4) for (let jx = 2; jx < this.hnx - 2; jx += 4) {
-      if (core(this.cityHeight, jz * this.hnx + jx, jx, jz, minH)) {
-        return { x: this.hMinX + jx * 0.5, z: this.hMinZ + jz * 0.5, h: this.cityHeight[jz * this.hnx + jx] };
-      }
-    }
-    return null;
-  }
-
   /** Test helper: a mapped spot under a hanging tower that reaches at least
-   * `drop` below the ceiling deck — with the same 3×3 core guarantee. */
+   * `drop` below the ceiling deck — with a 3×3 core guarantee, so a teleport
+   * survives the row's sub-degree yaw nudging the lookup a cell sideways. */
   citySpotUp(drop) {
     if (!this.cityCeil) return null;
     const bound = this.hangY - drop; // deep enough: tip at or below this
@@ -325,7 +301,7 @@ export class World {
         const j = (jz + dz) * this.hnx + (jx + dx);
         if (this.cityCeil[j] >= bound) solid = false; // any shallow/open neighbor → not a core
       }
-      if (solid) return { x: this.hMinX + jx * 0.5, z: this.hMinZ + jz * 0.5, tip };
+      if (solid) return { x: this.hMinX + jx * CELL, z: this.hMinZ + jz * CELL, tip };
     }
     return null;
   }
@@ -434,11 +410,11 @@ export class World {
     for (const d of this.decks) {
       if (d.position.z > plane.z + 65) d.position.z -= 520; // 4 decks: floor past the 360-unit spawn line, so shadows land the moment objects show
     }
-    for (const m of this.city) {
-      if (m.position.z > plane.z + 60) m.position.z -= this.citySpan; // the whole grid leapfrogs like the decks
-    }
+    const half = this.citySpan / this.cityUp.length / 2; // one row's depth
     for (const m of this.cityUp) {
-      if (m.position.z > plane.z + 60) m.position.z -= this.citySpan; // hang rows leapfrog in lockstep with their floor twins
+      // leapfrog only once the row has FULLY passed: rows are ~445 deep, so
+      // recycling on the near edge strands its far half as a gap in the sky
+      if (m.position.z - half > plane.z + 60) m.position.z -= this.citySpan;
     }
     // buildings are solid: dive into the city and a roof ends the run
     if (this.cityHit(plane.x, plane.y, plane.z)) onHit({ def: { type: 'city' } });
@@ -646,6 +622,13 @@ export class Input {
     this.steerX = 0; // -1..1 — kept on release: the plane HOLDS its lateral spot
     this.keys = { rise: false, left: false, right: false }; // W/S/↑/↓ rise (nothing dives), A/D + ←/→ steer
     this.keyHold = 0; // seconds the current steer key has been down — drift accelerates while held
+    this.doubleTap = false; // one-shot: second tap/click within DOUBLE_TAP_MS — the frame loop spends it as a climb kick
+    let lastTap = 0;
+    const tap = () => {
+      const now = performance.now();
+      if (now - lastTap < 300) this.doubleTap = true;
+      lastTap = now;
+    };
     // Touch steers by slide DIRECTION only — where the finger lands and
     // starts is irrelevant: slide left → drift left, slide right → drift
     // right, proportional to how far you slide. Stop sliding (or lift the
@@ -666,6 +649,7 @@ export class Input {
     const release = () => { on(false); dragging = false; };
     el.addEventListener('pointerdown', (e) => {
       on(true);
+      tap(); // double-click/tap = pop up
       dragging = e.pointerType === 'touch';
       lastX = e.clientX;
       if (!dragging) this.steerX = playX(e.clientX);
@@ -683,7 +667,7 @@ export class Input {
     const LEFT = ['KeyA', 'ArrowLeft'];
     const RIGHT = ['KeyD', 'ArrowRight'];
     window.addEventListener('keydown', (e) => {
-      if (RISE.includes(e.code)) { if (e.code !== 'Space') this.keys.rise = true; on(true); e.preventDefault(); }
+      if (RISE.includes(e.code)) { if (e.code !== 'Space') this.keys.rise = true; if (!e.repeat) tap(); on(true); e.preventDefault(); }
       else if (LEFT.includes(e.code)) { this.keys.left = true; e.preventDefault(); }
       else if (RIGHT.includes(e.code)) { this.keys.right = true; e.preventDefault(); }
     });
@@ -705,5 +689,5 @@ export class Input {
     this.steerX = Math.max(-1, Math.min(1, this.steerX + dir * rate * dt));
     return this.steerX;
   }
-  clearKeys() { this.keys.rise = this.keys.left = this.keys.right = false; this.keyHold = 0; }
+  clearKeys() { this.keys.rise = this.keys.left = this.keys.right = false; this.keyHold = 0; this.doubleTap = false; }
 }
