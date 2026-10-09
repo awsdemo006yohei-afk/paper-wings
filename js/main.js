@@ -1,7 +1,7 @@
 // Paper Wings — bootstrap, game loop, UI states.
 import * as THREE from './three.module.min.js';
 import { dailyTheme, newScore, applyScore, rankFor, speedAt, ringPoints, themeInk, isHardRing, thrillBoost } from './logic.js?v=19';
-import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=36';
+import { World, makePlane, installCraft, CRAFTS, Input } from './game.js?v=37';
 import { renderCard, shareCard } from './share.js?v=5';
 import { showInterstitial } from './ads.js';
 
@@ -29,10 +29,11 @@ $('gl').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const p = theme.palette;
-const sky = new THREE.Color(p.skyTop).lerp(new THREE.Color(p.skyBot), 0.35);
+const sky = new THREE.Color(p.fog); // sky = the day's pale horizon tone — sky, haze, and buildings all one washed paper color (#584)
 scene.background = sky;
 scene.fog = new THREE.Fog(p.fog, 60, 340);
 scene.add(new THREE.HemisphereLight(0xffffff, new THREE.Color(p.skyBot), 1.4));
+scene.add(new THREE.AmbientLight(0xffffff, 1.8)); // the ceiling and hang city live in shade — lift undersides into the day's pale tones (#584)
 const SUN_OFF = { x: 0, y: 50, z: -6 }; // sun overhead, a touch ahead: shadows stay under their objects, and vertical rings cast a readable oval instead of a hairline
 const sunLight = new THREE.DirectionalLight(p.sun, 2.0);
 sunLight.position.set(SUN_OFF.x, SUN_OFF.y, SUN_OFF.z);
