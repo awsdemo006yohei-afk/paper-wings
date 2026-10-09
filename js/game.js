@@ -116,21 +116,23 @@ export class World {
         for (const p of pieces) city.add(p);
         city.scale.setScalar(S);
         // raw Blender palette runs neon (candy yellows, cyans) — recolor every
-        // material INTO the day's palette. The city wears the sky's own pale
-        // horizon tone (fog → white), so buildings and sky read as one washed
-        // paper world on every day, pale or dark (#584).
+        // material INTO the day's palette: keep the model's value range (dark
+        // base → light trim), drop its hues entirely. The city always wears
+        // the sky it flies in, and no model re-export is ever needed.
         const pal = this.theme.palette;
-        const mistC = new THREE.Color(pal.fog), whiteC = new THREE.Color(0xffffff);
+        const inkC = new THREE.Color(pal.ink), mistC = new THREE.Color(pal.fog);
         const washed = new Set();
         city.traverse((o) => {
           if (!o.isMesh) return;
           for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
             if (m.color && !washed.has(m.uuid)) {
               washed.add(m.uuid);
-              m.map = null; m.vertexColors = false; // flat paper paint — baked textures would multiply the tint back to dark (#584)
-              if ('metalness' in m) m.metalness = 0; // metallic + no envMap = gray blackout; paper is matte
+              // flat ink paint: baked textures multiply the tint back to dark
+              // noise, and metallic + no envMap grays out — paint clean, matte
+              m.map = null; m.vertexColors = false;
+              if ('metalness' in m) m.metalness = 0;
               const lum = 0.3 * m.color.r + 0.55 * m.color.g + 0.15 * m.color.b;
-              m.color.copy(mistC).lerp(whiteC, 0.15 + 0.4 * Math.min(1, lum));
+              m.color.copy(inkC).lerp(mistC, 0.25 + 0.6 * Math.min(1, lum));
               if (m.emissive) m.emissive.copy(m.color).multiplyScalar(0.15); // hang city lives in shade — keep undersides readable
               if ('roughness' in m) m.roughness = Math.max(m.roughness, 0.85);
             }
@@ -352,15 +354,12 @@ export class World {
     if (type === 'ring') {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(3.2, 0.35, 8, 24),
-        // painted darker than the day's accent: the new ambient lift (#584)
-        // washes vertical faces, and rings must stay loud against a pale sky
-        new THREE.MeshStandardMaterial({ color: new THREE.Color(this.theme.palette.accent).multiplyScalar(0.55), roughness: 0.5, metalness: 0.1 }),
+        new THREE.MeshStandardMaterial({ color: this.theme.palette.accent, roughness: 0.5, metalness: 0.1 }),
       );
       ring.castShadow = true;
       return ring;
     }
-    // same compensation: blades stay steel-dark, boxes read tan, not cream-on-cream
-    const mat = new THREE.MeshStandardMaterial({ color: type === 'blade' ? 0x59606d : 0xcabd9d, roughness: 0.85, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ color: type === 'blade' ? 0x8b93a6 : 0xfff8ef, roughness: 0.85, flatShading: true });
     const g = type === 'blade'
       ? new THREE.BoxGeometry(7, 0.5, 0.5)
       : new THREE.BoxGeometry(1, 1, 1);
