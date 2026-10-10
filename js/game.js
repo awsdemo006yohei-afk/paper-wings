@@ -369,6 +369,21 @@ export class World {
       h.m.position.copy(h.p);
       h.m.rotation.copy(h.r);
     }
+    // fresh slice of the map every run: slide the rows to a random phase
+    // through the tile and a random slice across the map, with a fresh small
+    // yaw — the spawn stays fair at (0,2,0), the Shibuya overhead does not
+    if (this.cityCeil && this.cityUp.length) {
+      const tileD = this.citySpan / this.cityUp.length;
+      const dz = Math.random() * tileD; // one shared phase → the rows still tile seamlessly
+      const slack = Math.max(0, (this.hnx * CELL) / 2 - CORRIDOR.halfWidth - 10);
+      const dx = (Math.random() * 2 - 1) * slack;
+      for (const r of this.cityUp) {
+        const home = this.sceneryHome.find((h) => h.m === r);
+        r.position.x = (home ? home.p.x : 0) + dx;
+        r.position.z += dz;
+        r.rotation.y = (Math.random() * 2 - 1) * 0.05;
+      }
+    }
   }
 
   // ------------------------------------------------------------ obstacles

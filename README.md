@@ -4,6 +4,8 @@ A one-button 3D paper-rocket endless flyer. Hold to rise, release to dive, steer
 
 **Every day has its own sky** — the palette, the wind, and the world are seeded from the date, so everyone flying that day flies the same sky. Come back tomorrow for a new one.
 
+**Every run starts over a fresh slice of the city** — each takeoff slides the hanging map to a random stretch and a random phase through the tile, with a fresh slight yaw, so no two runs open on the same buildings. The spawn stays fair: always (0, 2, 0).
+
 ## Play
 
 Open `index.html` on any static host (or the GitHub Pages URL). No build step, no keys, no server — plain ES modules + vendored three.js r170.
