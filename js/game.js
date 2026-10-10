@@ -261,7 +261,38 @@ export class World {
         const ax = t[2].x - t[0].x, az = t[2].z - t[0].z;
         const bx = t[1].x - t[0].x, bz = t[1].z - t[0].z;
         const den = ax * bz - az * bx;
-        if (den === 0) continue; // edge-on wall line — the roof on top covers its footprint
+        if (Math.abs(den) < 0.2) {
+          // near-vertical wall (buildings are modeled as walls: zero footprint
+          // area, often open-bottomed) — the cell-center test above can never
+          // see it, so a whole tower reads open sky and the plane flies
+          // straight through ("hanging city object is still through-able").
+          // Rasterize the wall's x/z segment instead: every cell within ~0.85
+          // of the wall line takes the wall's own base as the tip.
+          const R = 0.85, R2 = R * R;
+          const wx0 = Math.max(0, Math.floor((Math.min(t[0].x, t[1].x, t[2].x) - R - this.hMinX) / CELL));
+          const wx1 = Math.min(this.hnx - 1, Math.ceil((Math.max(t[0].x, t[1].x, t[2].x) + R - this.hMinX) / CELL));
+          const wz0 = Math.max(0, Math.floor((Math.min(t[0].z, t[1].z, t[2].z) - R - this.hMinZ) / CELL));
+          const wz1 = Math.min(this.hnz - 1, Math.ceil((Math.max(t[0].z, t[1].z, t[2].z) + R - this.hMinZ) / CELL));
+          for (let jz = wz0; jz <= wz1; jz++) for (let jx = wx0; jx <= wx1; jx++) {
+            const cx = this.hMinX + (jx + 0.5) * CELL, cz = this.hMinZ + (jz + 0.5) * CELL;
+            let best = Infinity; // distance² from the cell center to the wall's 3 edges
+            for (let e = 0; e < 3; e++) {
+              const p = t[e], q = t[(e + 1) % 3];
+              const ex = q.x - p.x, ez = q.z - p.z;
+              const L2 = ex * ex + ez * ez;
+              let tt = L2 ? ((cx - p.x) * ex + (cz - p.z) * ez) / L2 : 0;
+              tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+              const dx = cx - (p.x + tt * ex), dz2 = cz - (p.z + tt * ez);
+              const d2 = dx * dx + dz2 * dz2;
+              if (d2 < best) best = d2;
+            }
+            if (best > R2) continue;
+            const at = jz * this.hnx + jx;
+            if (tips && lo < tips[at]) tips[at] = lo;
+            if (roofs && hi > roofs[at]) roofs[at] = hi;
+          }
+          continue;
+        }
         for (let jz = z0; jz <= z1; jz++) for (let jx = x0; jx <= x1; jx++) {
           const px = this.hMinX + (jx + 0.5) * CELL - t[0].x;
           const pz = this.hMinZ + (jz + 0.5) * CELL - t[0].z;
