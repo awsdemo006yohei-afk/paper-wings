@@ -294,6 +294,19 @@ export class World {
     return false;
   }
 
+  /** Does any part of the plane's hull touch a hanging building? The old
+   * center-only check let a wing slice through a tower untouched — the rule
+   * is "touch = crash", so sample the hull: center, four compass points,
+   * and the wing plane above/below, all at the craft's hit radius. */
+  cityHitHull(plane) {
+    const r = plane.userData?.hitR ?? 1.1;
+    const { x, y, z } = plane.position || plane; // tests pass a bare {x,y,z} plane
+    return this.cityHit(x, y, z)
+      || this.cityHit(x - r, y, z) || this.cityHit(x + r, y, z)
+      || this.cityHit(x, y, z - r) || this.cityHit(x, y, z + r)
+      || this.cityHit(x, y - r * 0.7, z) || this.cityHit(x, y + r * 0.7, z);
+  }
+
   /** Test helper: a mapped spot under a hanging tower that reaches at least
    * `drop` below the ceiling deck — with a 3×3 core guarantee, so a teleport
    * survives the row's sub-degree yaw nudging the lookup a cell sideways. */
@@ -427,8 +440,9 @@ export class World {
       // recycling on the near edge strands its far half as a gap in the sky
       if (m.position.z - half > plane.z + 60) m.position.z -= this.citySpan;
     }
-    // buildings are solid: dive into the city and a roof ends the run
-    if (this.cityHit(plane.x, plane.y, plane.z)) onHit({ def: { type: 'city' } });
+    // buildings are solid, and not just center-on: a wing that touches a
+    // tower ends the run too ("if plane touches hanging building, crash")
+    if (this.cityHitHull(plane)) onHit({ def: { type: 'city' } });
   }
 }
 
